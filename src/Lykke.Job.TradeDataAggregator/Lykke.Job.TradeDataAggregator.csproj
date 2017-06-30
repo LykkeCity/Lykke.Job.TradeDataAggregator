@@ -39,4 +39,10 @@
     <ProjectReference Include="..\Lykke.Job.TradeDataAggregator.Core\Lykke.Job.TradeDataAggregator.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Dockerfile">
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
