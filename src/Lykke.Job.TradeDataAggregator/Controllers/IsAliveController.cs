@@ -10,11 +10,11 @@ namespace Lykke.Job.TradeDataAggregator.Controllers
     [Route("api/[controller]")]
     public class IsAliveController : Controller
     {
-        private readonly IHealthService _helathService;
+        private readonly IHealthService _healthService;
 
-        public IsAliveController(IHealthService helathService)
+        public IsAliveController(IHealthService healthService)
         {
-            _helathService = helathService;
+            _healthService = healthService;
         }
 
         /// <summary>
@@ -27,7 +27,7 @@ namespace Lykke.Job.TradeDataAggregator.Controllers
         [ProducesResponseType(typeof(ErrorResponse), (int)HttpStatusCode.InternalServerError)]
         public IActionResult Get()
         {
-            var healthViloationMessage = _helathService.GetHealthViolationMessage();
+            var healthViloationMessage = _healthService.GetHealthViolationMessage();
             if (healthViloationMessage != null)
             {
                 return StatusCode((int) HttpStatusCode.InternalServerError, new ErrorResponse
@@ -40,9 +40,9 @@ namespace Lykke.Job.TradeDataAggregator.Controllers
             {
                 Version = Microsoft.Extensions.PlatformAbstractions.PlatformServices.Default.Application.ApplicationVersion,
                 Env = Environment.GetEnvironmentVariable("Env"),
-                LastClientsScanningStartedMoment = _helathService.LastClientsScanningStartedMoment,
-                LastClientsScanningDuration = _helathService.LastClientsScanningDuration,
-                MaxHealthyClientsScanningDuration = _helathService.MaxHealthyClientsScanningDuration
+                LastClientsScanningStartedMoment = _healthService.LastClientsScanningStartedMoment,
+                LastClientsScanningDuration = _healthService.LastClientsScanningDuration,
+                MaxHealthyClientsScanningDuration = _healthService.MaxHealthyClientsScanningDuration
             });
         }
     }

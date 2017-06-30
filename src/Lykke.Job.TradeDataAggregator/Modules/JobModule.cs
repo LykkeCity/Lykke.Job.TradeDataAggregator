@@ -47,6 +47,8 @@ namespace Lykke.Job.TradeDataAggregator.Modules
                 .SingleInstance()
                 .WithParameter(TypedParameter.From(_settings.MaxHealthyClientScanningDuration));
 
+            builder.RegisterType<TradeDataAggregationService>().As<ITradeDataAggregationService>();
+
             _services.UseAssetsClient(new AssetServiceSettings
             {
                 BaseUri = new Uri(_settings.Assets.ServiceUri)

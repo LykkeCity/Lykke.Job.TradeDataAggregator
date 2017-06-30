@@ -47,7 +47,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
         {
             if (WasLastClientsScanningFailed)
             {
-                return "Last clients scanning was filed";
+                return "Last clients scanning was failed";
             }
 
             if (!WasLastClientsScanningCompleted && !WasLastClientsScanningFailed && !WasClientsScanningEverStarted)
