@@ -4,11 +4,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Common;
 using Common.Log;
-using Lykke.Job.TradeDataAggregator.Core.Domain.Assets;
 using Lykke.Job.TradeDataAggregator.Core.Domain.CacheOperations;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Feed;
 using Lykke.JobTriggers.Triggers.Attributes;
+using Lykke.Service.Assets.Client;
+using Lykke.Service.Assets.Client.Custom;
 
 namespace Lykke.Job.TradeDataAggregator.TriggerHandlers
 {
@@ -33,21 +34,22 @@ namespace Lykke.Job.TradeDataAggregator.TriggerHandlers
 
         private readonly IClientTradesRepository _clientTradesRepository;
         private readonly IMarketDataRepository _marketDataRepository;
-        private readonly CachedDataDictionary<string, IAssetPair> _assetPairsDict;
+        private readonly IAssetsservice _assetsService;
         private readonly ILog _log;
         private readonly MarketProfile _marketProfile;
 
         private readonly Dictionary<string, TemporaryAggregatedData> _tempDataByLimitOrderAndDtId = new Dictionary<string, TemporaryAggregatedData>();
 
-        public TradeDataAggregationHandlers(IClientTradesRepository clientTradesRepository,
+        public TradeDataAggregationHandlers(
+            IClientTradesRepository clientTradesRepository,
             IMarketDataRepository marketDataRepository,
-            CachedDataDictionary<string, IAssetPair> assetPairsDict,
+            IAssetsservice assetsService,
             IAssetPairBestPriceRepository assetPairBestPriceRepository,
             ILog log)
         {
             _clientTradesRepository = clientTradesRepository;
             _marketDataRepository = marketDataRepository;
-            _assetPairsDict = assetPairsDict;
+            _assetsService = assetsService;
             _log = log;
             _marketProfile = assetPairBestPriceRepository.GetAsync().Result;
         }
@@ -55,38 +57,26 @@ namespace Lykke.Job.TradeDataAggregator.TriggerHandlers
         [TimerTrigger("00:30:00")]
         public async Task ScanClients()
         {
-            try
-            {
-                await _clientTradesRepository.ScanByDtAsync(HandleTradeRecords, DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)), DateTime.UtcNow);
+            await _clientTradesRepository.ScanByDtAsync(HandleTradeRecords, DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)), DateTime.UtcNow);
 
-                await FillMarketData();
-            }
-            catch (Exception ex)
-            {
-                await _log.WriteErrorAsync("TradeDataAggregator", "ScanClients", "", ex);
-            }
+            await FillMarketData();
         }
 
         private async Task FillMarketData()
         {
-            var assetPairsDict = await _assetPairsDict.GetDictionaryAsync();
-
             var newMarketData = new Dictionary<string, IMarketData>();
-            var assetPairs = assetPairsDict.Values.ToArray();
-
+            var assetPairs = (await _assetsService.GetAssetPairsAsync());
             var tempDataValues = _tempDataByLimitOrderAndDtId.Values.OrderBy(x => x.Dt);
 
             foreach (var record in tempDataValues)
             {
                 try
                 {
-                    var assetPair = assetPairs.PairWithAssets(record.Asset1, record.Asset2);
+                    var assetPair = FindPairWithAssets(assetPairs, record.Asset1, record.Asset2);
                     if (assetPair != null && record.Volume1 > 0 &&
                         _marketProfile.Profile.Any(x => x.Asset == assetPair.Id))
                     {
-                        bool isInverted = assetPair.IsInverted(record.Asset1);
-
-
+                        var isInverted = IsInvertedTarget(assetPair, record.Asset1);
                         var volume = isInverted ? record.Volume1 : record.Volume2;
 
                         if (newMarketData.ContainsKey(assetPair.Id))
@@ -113,6 +103,19 @@ namespace Lykke.Job.TradeDataAggregator.TriggerHandlers
             }
 
             await _marketDataRepository.AddOrMergeMarketData(newMarketData.Values);
+        }
+
+        private static IAssetPair FindPairWithAssets(IEnumerable<IAssetPair> src, string assetId1, string assetId2)
+        {
+            return src.FirstOrDefault(assetPair =>
+                assetPair.BaseAssetId == assetId1 && assetPair.QuotingAssetId == assetId2 ||
+                assetPair.BaseAssetId == assetId2 && assetPair.QuotingAssetId == assetId1
+            );
+        }
+
+        private static bool IsInvertedTarget(IAssetPair assetPair, string targetAsset)
+        {
+            return assetPair.QuotingAssetId == targetAsset;
         }
 
         private async Task HandleTradeRecords(IEnumerable<IClientTrade> trades)

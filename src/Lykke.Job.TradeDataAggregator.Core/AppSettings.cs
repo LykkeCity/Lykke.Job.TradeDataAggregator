@@ -1,4 +1,6 @@
-﻿namespace Lykke.Job.TradeDataAggregator.Core
+﻿using System;
+
+namespace Lykke.Job.TradeDataAggregator.Core
 {
     public class AppSettings
     {
@@ -8,6 +10,7 @@
         public class TradeDataAggregatorSettings
         {
             public DbSettings Db { get; set; }
+            public AssetsServiceSettings Assets { get; set; }
         }
 
         public class DbSettings
@@ -16,6 +19,11 @@
             public string HTradesConnString { get; set; }
             public string DictsConnString { get; set; }
             public string HLiquidityConnString { get; set; }
+        }
+
+        public class AssetsServiceSettings
+        {
+            public Uri ServiceUri { get; set; }
         }
 
         public class SlackNotificationsSettings

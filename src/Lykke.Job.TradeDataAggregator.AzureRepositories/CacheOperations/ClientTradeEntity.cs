@@ -40,97 +40,13 @@ namespace Lykke.Job.TradeDataAggregator.AzureRepositories.CacheOperations
         public double Volume { get; set; }
         public string ClientId { get; set; }
 
-        public static class ByClientId
-        {
-            public static string GeneratePartitionKey(string clientId)
-            {
-                return clientId;
-            }
-
-            public static string GenerateRowKey(string tradeId)
-            {
-                return tradeId;
-            }
-
-            public static ClientTradeEntity Create(IClientTrade src)
-            {
-                var entity = CreateNew(src);
-                entity.RowKey = GenerateRowKey(src.Id);
-                entity.PartitionKey = GeneratePartitionKey(src.ClientId);
-                return entity;
-            }
-        }
-
-        public static class ByMultisig
-        {
-            public static string GeneratePartitionKey(string multisig)
-            {
-                return multisig;
-            }
-
-            public static string GenerateRowKey(string tradeId)
-            {
-                return tradeId;
-            }
-
-            public static ClientTradeEntity Create(IClientTrade src)
-            {
-                var entity = CreateNew(src);
-                entity.RowKey = GenerateRowKey(src.Id);
-                entity.PartitionKey = GeneratePartitionKey(src.Multisig);
-                return entity;
-            }
-        }
-
         public static class ByDt
         {
-            public static string GeneratePartitionKey()
-            {
-                return "dt";
-            }
-
-            public static string GenerateRowKey(string tradeId)
-            {
-                return tradeId;
-            }
-
             public static string GetRowKeyPart(DateTime dt)
             {
                 //ME rowkey format e.g. 20160812180446244_00130
-                return $"{dt.Year}{dt.Month.ToString("00")}{dt.Day.ToString("00")}{dt.Hour.ToString("00")}{dt.Minute.ToString("00")}";
+                return $"{dt.Year}{dt.Month:00}{dt.Day:00}{dt.Hour:00}{dt.Minute:00}";
             }
-
-            public static ClientTradeEntity Create(IClientTrade src)
-            {
-                var entity = CreateNew(src);
-                entity.RowKey = GenerateRowKey(src.Id);
-                entity.PartitionKey = GeneratePartitionKey();
-                return entity;
-            }
-        }
-
-        public static ClientTradeEntity CreateNew(IClientTrade src)
-        {
-            return new ClientTradeEntity
-            {
-                ClientId = src.ClientId,
-                AssetId = src.AssetId,
-                DateTime = src.DateTime,
-                LimitOrderId = src.LimitOrderId,
-                MarketOrderId = src.MarketOrderId,
-                Volume = src.Amount,
-                BlockChainHash = src.BlockChainHash,
-                Price = src.Price,
-                IsHidden = src.IsHidden,
-                AddressFrom = src.AddressFrom,
-                AddressTo = src.AddressTo,
-                Multisig = src.Multisig,
-                DetectionTime = src.DetectionTime,
-                Confirmations = src.Confirmations,
-                IsSettled = src.IsSettled,
-                State = src.State,
-                TransactionId = src.TransactionId
-            };
         }
     }
 }

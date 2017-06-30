@@ -27,20 +27,5 @@ namespace Lykke.Job.TradeDataAggregator.AzureRepositories.Feed
             };
 
         }
-
-        public async Task<IFeedData> GetAsync(string assetPairId)
-        {
-            var partitionKey = FeedDataEntity.Profile.GeneratePartitionKey();
-            var rowKey = FeedDataEntity.Profile.GenerateRowKey(assetPairId);
-
-            return await _tableStorage.GetDataAsync(partitionKey, rowKey);
-
-        }
-
-        public async Task SaveAsync(IFeedData feedData)
-        {
-            var newEntity = FeedDataEntity.Profile.CreateNew(feedData);
-            await _tableStorage.InsertOrReplaceAsync(newEntity);
-        }
     }
 }
