@@ -39,7 +39,7 @@ namespace Lykke.Job.TradeDataAggregator.Controllers
             return Ok(new IsAliveResponse
             {
                 Version = Microsoft.Extensions.PlatformAbstractions.PlatformServices.Default.Application.ApplicationVersion,
-                Env = Environment.GetEnvironmentVariable("Env"),
+                Env = Environment.GetEnvironmentVariable("ENV_INFO"),
                 LastClientsScanningStartedMoment = _healthService.LastClientsScanningStartedMoment,
                 LastClientsScanningDuration = _healthService.LastClientsScanningDuration,
                 MaxHealthyClientsScanningDuration = _healthService.MaxHealthyClientsScanningDuration
