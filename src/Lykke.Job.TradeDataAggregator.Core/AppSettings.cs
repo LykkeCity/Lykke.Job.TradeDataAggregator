@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Lykke.Job.TradeDataAggregator.Core
+﻿namespace Lykke.Job.TradeDataAggregator.Core
 {
     public class AppSettings
     {
@@ -23,7 +21,7 @@ namespace Lykke.Job.TradeDataAggregator.Core
 
         public class AssetsServiceSettings
         {
-            public Uri ServiceUri { get; set; }
+            public string ServiceUri { get; set; }
         }
 
         public class SlackNotificationsSettings

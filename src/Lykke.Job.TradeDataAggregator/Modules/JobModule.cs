@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using System;
+using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using AzureStorage.Tables;
 using Common.Log;
@@ -41,7 +42,7 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             _services.UseAssetsClient(new AssetServiceSettings
             {
-                BaseUri = _settings.Assets.ServiceUri
+                BaseUri = new Uri(_settings.Assets.ServiceUri)
             });
 
             RegisterAzureRepositories(builder, _settings.Db, _log);
