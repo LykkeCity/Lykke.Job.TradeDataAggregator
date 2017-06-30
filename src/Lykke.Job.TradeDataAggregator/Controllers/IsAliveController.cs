@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Job.TradeDataAggregator.Models;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.SwaggerGen.Annotations;
@@ -9,6 +10,13 @@ namespace Lykke.Job.TradeDataAggregator.Controllers
     [Route("api/[controller]")]
     public class IsAliveController : Controller
     {
+        private readonly IHealthService _helathService;
+
+        public IsAliveController(IHealthService helathService)
+        {
+            _helathService = helathService;
+        }
+
         /// <summary>
         /// Checks service is alive
         /// </summary>
@@ -19,20 +27,22 @@ namespace Lykke.Job.TradeDataAggregator.Controllers
         [ProducesResponseType(typeof(ErrorResponse), (int)HttpStatusCode.InternalServerError)]
         public IActionResult Get()
         {
-            // TODO: Check job health status here, if job unhealthy, send ErrorResponse
-            // if (!isHealthy)
-            // {
-            //     return StatusCode((int) HttpStatusCode.InternalServerError, new ErrorResponse
-            //     {
-            //         ErrorMessage = "Problem description"
-            //     });
-            // }
+            var healthViloationMessage = _helathService.GetHealthViolationMessage();
+            if (healthViloationMessage != null)
+            {
+                return StatusCode((int) HttpStatusCode.InternalServerError, new ErrorResponse
+                {
+                    ErrorMessage = $"Job is unhealthy: {healthViloationMessage}"
+                });
+            }
 
-            // NOTE: Feel free to extend IsAliveResponse, to display job-specific health status
             return Ok(new IsAliveResponse
             {
                 Version = Microsoft.Extensions.PlatformAbstractions.PlatformServices.Default.Application.ApplicationVersion,
-                Env = Environment.GetEnvironmentVariable("Env")
+                Env = Environment.GetEnvironmentVariable("Env"),
+                LastClientsScanningStartedMoment = _helathService.LastClientsScanningStartedMoment,
+                LastClientsScanningDuration = _helathService.LastClientsScanningDuration,
+                MaxHealthyClientsScanningDuration = _helathService.MaxHealthyClientsScanningDuration
             });
         }
     }

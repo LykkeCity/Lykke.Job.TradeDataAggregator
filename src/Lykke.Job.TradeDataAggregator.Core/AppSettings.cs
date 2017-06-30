@@ -1,4 +1,6 @@
-﻿namespace Lykke.Job.TradeDataAggregator.Core
+﻿using System;
+
+namespace Lykke.Job.TradeDataAggregator.Core
 {
     public class AppSettings
     {
@@ -9,6 +11,7 @@
         {
             public DbSettings Db { get; set; }
             public AssetsServiceSettings Assets { get; set; }
+            public TimeSpan MaxHealthyClientScanningDuration { get; set; }
         }
 
         public class DbSettings

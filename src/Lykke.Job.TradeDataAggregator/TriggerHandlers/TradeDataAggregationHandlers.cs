@@ -7,6 +7,7 @@ using Common.Log;
 using Lykke.Job.TradeDataAggregator.Core.Domain.CacheOperations;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Feed;
+using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.JobTriggers.Triggers.Attributes;
 using Lykke.Service.Assets.Client;
 using Lykke.Service.Assets.Client.Custom;
@@ -35,6 +36,7 @@ namespace Lykke.Job.TradeDataAggregator.TriggerHandlers
         private readonly IClientTradesRepository _clientTradesRepository;
         private readonly IMarketDataRepository _marketDataRepository;
         private readonly IAssetsservice _assetsService;
+        private readonly IHealthService _helathService;
         private readonly ILog _log;
         private readonly MarketProfile _marketProfile;
 
@@ -45,21 +47,35 @@ namespace Lykke.Job.TradeDataAggregator.TriggerHandlers
             IMarketDataRepository marketDataRepository,
             IAssetsservice assetsService,
             IAssetPairBestPriceRepository assetPairBestPriceRepository,
+            IHealthService helathService,
             ILog log)
         {
             _clientTradesRepository = clientTradesRepository;
             _marketDataRepository = marketDataRepository;
             _assetsService = assetsService;
+            _helathService = helathService;
             _log = log;
             _marketProfile = assetPairBestPriceRepository.GetAsync().Result;
         }
 
-        [TimerTrigger("00:30:00")]
+        [TimerTrigger("00:00:30")]
         public async Task ScanClients()
         {
-            await _clientTradesRepository.ScanByDtAsync(HandleTradeRecords, DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)), DateTime.UtcNow);
+            try
+            {
+                _helathService.TraceClientsScanningStarted();
 
-            await FillMarketData();
+                await _clientTradesRepository.ScanByDtAsync(HandleTradeRecords,
+                    DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)), DateTime.UtcNow);
+
+                await FillMarketData();
+
+                _helathService.TraceClientsScanningCompleted();
+            }
+            catch
+            {
+                _helathService.TraceClientsScanningFailed();
+            }
         }
 
         private async Task FillMarketData()

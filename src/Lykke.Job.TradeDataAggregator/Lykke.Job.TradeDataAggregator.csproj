@@ -37,6 +37,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Lykke.Job.TradeDataAggregator.AzureRepositories\Lykke.Job.TradeDataAggregator.AzureRepositories.csproj" />
     <ProjectReference Include="..\Lykke.Job.TradeDataAggregator.Core\Lykke.Job.TradeDataAggregator.Core.csproj" />
+    <ProjectReference Include="..\Lykke.Job.TradeDataAggregator.Services\Lykke.Job.TradeDataAggregator.Services.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -10,8 +10,10 @@ using Lykke.Job.TradeDataAggregator.Core;
 using Lykke.Job.TradeDataAggregator.Core.Domain.CacheOperations;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Feed;
+using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Service.Assets.Client.Custom;
 using Microsoft.Extensions.DependencyInjection;
+using Lykke.Job.TradeDataAggregator.Services;
 
 namespace Lykke.Job.TradeDataAggregator.Modules
 {
@@ -39,6 +41,11 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             // NOTE: You can implement your own poison queue notifier. See https://github.com/LykkeCity/JobTriggers/blob/master/readme.md
             // builder.Register<PoisionQueueNotifierImplementation>().As<IPoisionQueueNotifier>();
+
+            builder.RegisterType<HealthService>()
+                .As<IHealthService>()
+                .SingleInstance()
+                .WithParameter(TypedParameter.From(_settings.MaxHealthyClientScanningDuration));
 
             _services.UseAssetsClient(new AssetServiceSettings
             {
