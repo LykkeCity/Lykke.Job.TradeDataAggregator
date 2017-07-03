@@ -18,7 +18,6 @@ namespace Lykke.Job.TradeDataAggregator.Core
         {
             public string LogsConnString { get; set; }
             public string HTradesConnString { get; set; }
-            public string DictsConnString { get; set; }
             public string HLiquidityConnString { get; set; }
         }
 
