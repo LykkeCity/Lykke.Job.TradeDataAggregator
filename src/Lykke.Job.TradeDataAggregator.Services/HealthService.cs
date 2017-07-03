@@ -60,9 +60,10 @@ namespace Lykke.Job.TradeDataAggregator.Services
                 return $"Waiting {DateTime.UtcNow - LastClientsScanningStartedMoment} for first clients scanning execution completed";
             }
 
-            if (LastClientsScanningDuration > MaxHealthyClientsScanningDuration)
+            var lastDuration = LastClientsScanningDuration;
+            if (lastDuration > MaxHealthyClientsScanningDuration)
             {
-                return $"Last clients scanning was lasted for {LastClientsScanningDuration}, which is too long";
+                return $"Last clients scanning was lasted for {lastDuration}, which is too long";
             }
 
             return null;
