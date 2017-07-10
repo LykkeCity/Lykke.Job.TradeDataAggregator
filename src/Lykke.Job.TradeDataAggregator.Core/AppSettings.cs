@@ -6,11 +6,11 @@ namespace Lykke.Job.TradeDataAggregator.Core
     {
         public TradeDataAggregatorSettings TradeDataAggregatorJob { get; set; }
         public SlackNotificationsSettings SlackNotifications { get; set; }
+        public AssetsSettings Assets { get; set; }
 
         public class TradeDataAggregatorSettings
         {
             public DbSettings Db { get; set; }
-            public AssetsServiceSettings Assets { get; set; }
             public TimeSpan MaxHealthyClientScanningDuration { get; set; }
         }
 
@@ -21,9 +21,9 @@ namespace Lykke.Job.TradeDataAggregator.Core
             public string HLiquidityConnString { get; set; }
         }
 
-        public class AssetsServiceSettings
+        public class AssetsSettings
         {
-            public string ServiceUri { get; set; }
+            public string ServiceUrl { get; set; }
         }
 
         public class SlackNotificationsSettings

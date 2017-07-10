@@ -57,7 +57,7 @@ namespace Lykke.Job.TradeDataAggregator
                 : HttpSettingsLoader.Load<AppSettings>(Configuration.GetValue<string>("SettingsUrl"));
             var log = CreateLogWithSlack(services, appSettings);
 
-            builder.RegisterModule(new JobModule(appSettings.TradeDataAggregatorJob, log));
+            builder.RegisterModule(new JobModule(appSettings, log));
             builder.AddTriggers();
             builder.Populate(services);
 

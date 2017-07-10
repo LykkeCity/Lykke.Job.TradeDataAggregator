@@ -19,11 +19,11 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 {
     public class JobModule : Module
     {
-        private readonly AppSettings.TradeDataAggregatorSettings _settings;
+        private readonly AppSettings _settings;
         private readonly ILog _log;
-        private ServiceCollection _services;
+        private readonly ServiceCollection _services;
 
-        public JobModule(AppSettings.TradeDataAggregatorSettings settings, ILog log)
+        public JobModule(AppSettings settings, ILog log)
         {
             _settings = settings;
             _log = log;
@@ -32,7 +32,7 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterInstance(_settings)
+            builder.RegisterInstance(_settings.TradeDataAggregatorJob)
                 .SingleInstance();
 
             builder.RegisterInstance(_log)
@@ -45,16 +45,16 @@ namespace Lykke.Job.TradeDataAggregator.Modules
             builder.RegisterType<HealthService>()
                 .As<IHealthService>()
                 .SingleInstance()
-                .WithParameter(TypedParameter.From(_settings.MaxHealthyClientScanningDuration));
+                .WithParameter(TypedParameter.From(_settings.TradeDataAggregatorJob.MaxHealthyClientScanningDuration));
 
             builder.RegisterType<TradeDataAggregationService>().As<ITradeDataAggregationService>();
 
             _services.UseAssetsClient(new AssetServiceSettings
             {
-                BaseUri = new Uri(_settings.Assets.ServiceUri)
+                BaseUri = new Uri(_settings.Assets.ServiceUrl)
             });
 
-            RegisterAzureRepositories(builder, _settings.Db, _log);
+            RegisterAzureRepositories(builder, _settings.TradeDataAggregatorJob.Db, _log);
 
             builder.Populate(_services);
         }
