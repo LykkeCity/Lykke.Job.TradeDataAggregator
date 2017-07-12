@@ -42,7 +42,8 @@ namespace Lykke.Job.TradeDataAggregator.Controllers
                 Env = Environment.GetEnvironmentVariable("ENV_INFO"),
                 LastClientsScanningStartedMoment = _healthService.LastClientsScanningStartedMoment,
                 LastClientsScanningDuration = _healthService.LastClientsScanningDuration,
-                MaxHealthyClientsScanningDuration = _healthService.MaxHealthyClientsScanningDuration
+                MaxHealthyClientsScanningDuration = _healthService.MaxHealthyClientsScanningDuration,
+                HealthWarning = _healthService.GetHealthWarningMessage() ?? "No"
             });
         }
     }

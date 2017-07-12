@@ -12,5 +12,6 @@ namespace Lykke.Job.TradeDataAggregator.Core.Services
         void TraceClientsScanningCompleted();
         void TraceClientsScanningFailed();
         string GetHealthViolationMessage();
+        string GetHealthWarningMessage();
     }
 }
