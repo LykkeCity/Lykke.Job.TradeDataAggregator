@@ -50,6 +50,11 @@ namespace Lykke.Job.TradeDataAggregator.Services
                 return "Last clients scanning was failed";
             }
 
+            return null;
+        }
+
+        public string GetHealthWarningMessage()
+        {
             if (!WasLastClientsScanningCompleted && !WasLastClientsScanningFailed && !WasClientsScanningEverStarted)
             {
                 return "Waiting for first clients scanning execution started";

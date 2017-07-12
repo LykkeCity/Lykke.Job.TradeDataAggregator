@@ -9,5 +9,6 @@ namespace Lykke.Job.TradeDataAggregator.Models
         public DateTime LastClientsScanningStartedMoment { get; set; }
         public TimeSpan LastClientsScanningDuration { get; set; }
         public TimeSpan MaxHealthyClientsScanningDuration { get; set; }
+        public string HealthWarning { get; set; }
     }
 }
