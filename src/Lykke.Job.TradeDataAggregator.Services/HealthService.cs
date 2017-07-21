@@ -45,11 +45,6 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
         public string GetHealthViolationMessage()
         {
-            if (WasLastClientsScanningFailed)
-            {
-                return "Last clients scanning was failed";
-            }
-
             return null;
         }
 
@@ -69,6 +64,11 @@ namespace Lykke.Job.TradeDataAggregator.Services
             if (lastDuration > MaxHealthyClientsScanningDuration)
             {
                 return $"Last clients scanning was lasted for {lastDuration}, which is too long";
+            }
+
+            if (WasLastClientsScanningFailed)
+            {
+                return "Last clients scanning was failed";
             }
 
             return null;
