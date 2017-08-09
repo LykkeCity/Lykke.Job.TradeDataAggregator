@@ -4,12 +4,13 @@ using System.Linq;
 using System.Threading.Tasks;
 using Common;
 using Common.Log;
-using Lykke.Job.TradeDataAggregator.Core.Domain.CacheOperations;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Feed;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Service.Assets.Client;
 using Lykke.Service.Assets.Client.Custom;
+using Lykke.Service.OperationsRepository.AutorestClient.Models;
+using Lykke.Service.OperationsRepository.Client.Abstractions.CashOperations;
 
 namespace Lykke.Job.TradeDataAggregator.Services
 {
@@ -32,7 +33,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
             }
         }
 
-        private readonly IClientTradesRepository _clientTradesRepository;
+        private readonly ITradeOperationsRepositoryClient _clientTradesRepositoryClient;
         private readonly IMarketDataRepository _marketDataRepository;
         private readonly IAssetsservice _assetsService;
         private readonly ILog _log;
@@ -41,13 +42,13 @@ namespace Lykke.Job.TradeDataAggregator.Services
         private readonly Dictionary<string, TemporaryAggregatedData> _tempDataByLimitOrderAndDtId = new Dictionary<string, TemporaryAggregatedData>();
 
         public TradeDataAggregationService(
-            IClientTradesRepository clientTradesRepository,
+            ITradeOperationsRepositoryClient clientTradesRepositoryClient,
             IMarketDataRepository marketDataRepository,
             IAssetsservice assetsService,
             IAssetPairBestPriceRepository assetPairBestPriceRepository,
             ILog log)
         {
-            _clientTradesRepository = clientTradesRepository;
+            _clientTradesRepositoryClient = clientTradesRepositoryClient;
             _marketDataRepository = marketDataRepository;
             _assetsService = assetsService;
             _log = log;
@@ -56,7 +57,11 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
         public async Task ScanClientsAsync()
         {
-            await _clientTradesRepository.ScanByDtAsync(HandleTradeRecords, DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)), DateTime.UtcNow);
+            var trades = await _clientTradesRepositoryClient.ScanByDtAsync(
+                DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)),
+                DateTime.UtcNow);
+
+            await HandleTradeRecords(trades);
 
             await FillMarketData();
         }
@@ -117,7 +122,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
             return assetPair.QuotingAssetId == targetAsset;
         }
 
-        private async Task HandleTradeRecords(IEnumerable<IClientTrade> trades)
+        private async Task HandleTradeRecords(IEnumerable<ClientTrade> trades)
         {
             foreach (var item in trades)
             {
@@ -132,9 +137,9 @@ namespace Lykke.Job.TradeDataAggregator.Services
             }
         }
 
-        private void HandleTradeRecord(IClientTrade trade)
+        private void HandleTradeRecord(ClientTrade trade)
         {
-            var key = TemporaryAggregatedData.CreateKey(trade.LimitOrderId, trade.DateTime);
+            var key = TemporaryAggregatedData.CreateKey(trade.LimitOrderId, trade.DateTime ?? default(DateTime));
             if (!_tempDataByLimitOrderAndDtId.ContainsKey(key))
             {
                 _tempDataByLimitOrderAndDtId.Add(key, new TemporaryAggregatedData
@@ -142,9 +147,9 @@ namespace Lykke.Job.TradeDataAggregator.Services
                     Asset1 = trade.AssetId,
                     ClientId = trade.ClientId,
                     LimitOrderAndDateTimeKey = key,
-                    Volume1 = Math.Abs(trade.Amount),
-                    Price = trade.Price,
-                    Dt = trade.DateTime
+                    Volume1 = Math.Abs(trade.Amount ?? default(double)),
+                    Price = trade.Price ?? default(double),
+                    Dt = trade.DateTime ?? default(DateTime)
                 });
                 return;
             }
@@ -153,7 +158,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
             if (tempRecord.ClientId == trade.ClientId)
             {
                 tempRecord.Asset2 = trade.AssetId;
-                tempRecord.Volume2 = Math.Abs(trade.Amount);
+                tempRecord.Volume2 = Math.Abs(trade.Amount ?? default(double));
             }
         }
     }

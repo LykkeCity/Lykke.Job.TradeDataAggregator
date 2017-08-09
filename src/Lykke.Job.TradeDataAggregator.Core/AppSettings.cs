@@ -7,6 +7,7 @@ namespace Lykke.Job.TradeDataAggregator.Core
         public TradeDataAggregatorSettings TradeDataAggregatorJob { get; set; }
         public SlackNotificationsSettings SlackNotifications { get; set; }
         public AssetsSettings Assets { get; set; }
+        public OperationsRepositoryClientSettings OperationsRepositoryClient { get; set; }
 
         public class TradeDataAggregatorSettings
         {
@@ -38,6 +39,12 @@ namespace Lykke.Job.TradeDataAggregator.Core
             public string ConnectionString { get; set; }
 
             public string QueueName { get; set; }
+        }
+
+        public class OperationsRepositoryClientSettings
+        {
+            public string ServiceUrl { get; set; }
+            public int RequestTimeout { get; set; }
         }
     }
 }
