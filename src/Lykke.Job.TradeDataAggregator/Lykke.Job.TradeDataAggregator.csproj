@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Lykke.Common" Version="1.1.76" />
+    <PackageReference Include="Lykke.Common" Version="1.1.79" />
     <PackageReference Include="Lykke.Common.ApiLibrary" Version="1.0.7" />
     <PackageReference Include="Lykke.JobTriggers" Version="1.1.9" />
     <PackageReference Include="Lykke.Logs" Version="1.0.17" />
