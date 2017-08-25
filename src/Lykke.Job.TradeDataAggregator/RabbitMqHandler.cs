@@ -41,7 +41,7 @@ namespace Lykke.Job.TradeDataAggregator
             var rabbitSettings = new RabbitMqSubscriptionSettings
             {
                 ConnectionString =
-                    $"amqp://{_rabbitMqSettings.Username}:{_rabbitMqSettings.Password}@{"13.80.150.220"}:{_rabbitMqSettings.Port}",
+                    $"amqp://{_rabbitMqSettings.Username}:{_rabbitMqSettings.Password}@{_rabbitMqSettings.Host}:{_rabbitMqSettings.Port}",
                 ExchangeName = _rabbitMqSettings.ExchangeSwap,
                 IsDurable = false,
                 QueueName = $"{_rabbitMqSettings.ExchangeSwap}-tradedataaggregator",
@@ -74,12 +74,18 @@ namespace Lykke.Job.TradeDataAggregator
 
             bool isLimitAssetBase = message.Trades.First().LimitAsset == pair.BaseAssetId;
 
+            var limitAsset = await _assetsService.GetAssetAsync(message.Trades.First().LimitAsset) as AssetResponseModel;
+            if (limitAsset == null) throw new ArgumentNullException(nameof(limitAsset));
+
+            var marketAsset = await _assetsService.GetAssetAsync(message.Trades.First().MarketAsset) as AssetResponseModel;
+            if (marketAsset == null) throw new ArgumentNullException(nameof(marketAsset));
+
             foreach (var trade in message.Trades)
             {
                 await _tradesCommonRepository.InsertCommonTrade(new TradeCommon
                 {
                     Amount = isLimitAssetBase ? trade.LimitVolume : trade.MarketVolume,
-                    BaseAsset = isLimitAssetBase ? trade.LimitAsset : trade.MarketAsset,
+                    BaseAsset = isLimitAssetBase ? limitAsset.DisplayId : marketAsset.DisplayId,
                     Dt = trade.Timestamp,
                     Id = Guid.NewGuid().ToString(),
                     LimitOrderId = trade.LimitOrderId,
