@@ -7,6 +7,7 @@ namespace Lykke.Job.TradeDataAggregator.Core
         public TradeDataAggregatorSettings TradeDataAggregatorJob { get; set; }
         public SlackNotificationsSettings SlackNotifications { get; set; }
         public AssetsSettings Assets { get; set; }
+        public RabbitMqSettings RabbitMq { get; set; }
 
         public class TradeDataAggregatorSettings
         {
@@ -39,5 +40,18 @@ namespace Lykke.Job.TradeDataAggregator.Core
 
             public string QueueName { get; set; }
         }
+
+        public class RabbitMqSettings
+        {
+            public string ExternalHost { get; set; }
+            public string Host { get; set; }
+
+            public int Port { get; set; }
+            public string Username { get; set; }
+            public string Password { get; set; }
+
+            public string ExchangeSwap { get; set; }
+        }
+
     }
 }

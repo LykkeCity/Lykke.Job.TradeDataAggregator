@@ -1,15 +1,23 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.Loader;
+using System.Threading.Tasks;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using AzureStorage.Tables;
+using Common;
 using Common.Log;
 using Lykke.Common.ApiLibrary.Middleware;
 using Lykke.Common.ApiLibrary.Swagger;
 using Lykke.Job.TradeDataAggregator.Core;
 using Lykke.Job.TradeDataAggregator.Models;
 using Lykke.Job.TradeDataAggregator.Modules;
+using Lykke.Job.TradeDataAggregator.Services.Models;
 using Lykke.JobTriggers.Extenstions;
 using Lykke.Logs;
+using Lykke.RabbitMqBroker;
+using Lykke.RabbitMqBroker.Subscriber;
 using Lykke.SettingsReader;
 using Lykke.SlackNotification.AzureQueue;
 using Microsoft.AspNetCore.Builder;
@@ -59,6 +67,14 @@ namespace Lykke.Job.TradeDataAggregator
 
             builder.RegisterModule(new JobModule(appSettings, log));
             builder.AddTriggers();
+
+            builder.RegisterInstance(appSettings.RabbitMq).SingleInstance();
+
+            builder.RegisterType<RabbitMqHandler>()
+                .AsSelf()
+                .As<IStartable>()
+                .SingleInstance();
+
             builder.Populate(services);
 
             ApplicationContainer = builder.Build();
