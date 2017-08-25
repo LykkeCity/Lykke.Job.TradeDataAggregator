@@ -86,12 +86,14 @@ namespace Lykke.Job.TradeDataAggregator
                 {
                     Amount = isLimitAssetBase ? trade.LimitVolume : trade.MarketVolume,
                     BaseAsset = isLimitAssetBase ? limitAsset.DisplayId : marketAsset.DisplayId,
+                    BaseAssetId = isLimitAssetBase ? trade.LimitAsset : trade.MarketAsset,
+                    QuotAssetId = isLimitAssetBase ? trade.MarketAsset : trade.LimitAsset,
                     Dt = trade.Timestamp,
                     Id = Guid.NewGuid().ToString(),
                     LimitOrderId = trade.LimitOrderId,
                     MarketOrderId = message.Order.Id,
                     Price = trade.Price.GetValueOrDefault(),
-                    QuotAsset = isLimitAssetBase ? trade.MarketAsset : trade.LimitAsset,
+                    QuotAsset = isLimitAssetBase ? marketAsset.DisplayId : limitAsset.DisplayId,
                 });
             }
         }

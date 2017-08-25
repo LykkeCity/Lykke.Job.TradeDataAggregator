@@ -21,6 +21,8 @@ namespace Lykke.Job.TradeDataAggregator.Core.Domain.Exchange
         public DateTime Dt { get; set; }
         public string BaseAsset { get; set; }
         public string QuotAsset { get; set; }
+        public string BaseAssetId { get; set; }
+        public string QuotAssetId { get; set; }
         public double Price { get; set; }
         public double Amount { get; set; }
         public string LimitOrderId { get; set; }
