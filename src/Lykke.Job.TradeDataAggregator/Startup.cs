@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using AzureStorage.Tables;
@@ -9,6 +10,7 @@ using Lykke.Job.TradeDataAggregator.Core;
 using Lykke.Job.TradeDataAggregator.Models;
 using Lykke.Job.TradeDataAggregator.Modules;
 using Lykke.JobTriggers.Extenstions;
+using Lykke.JobTriggers.Triggers;
 using Lykke.Logs;
 using Lykke.SettingsReader;
 using Lykke.SlackNotification.AzureQueue;
@@ -24,6 +26,11 @@ namespace Lykke.Job.TradeDataAggregator
         public IHostingEnvironment Environment { get; }
         public IContainer ApplicationContainer { get; set; }
         public IConfigurationRoot Configuration { get; }
+
+        private TriggerHost _triggerHost;
+        private Task _triggerHostTask;
+
+        private const string AppName = "Lykke.Job.TradeDataAggregator";
 
         public Startup(IHostingEnvironment env)
         {
@@ -78,11 +85,28 @@ namespace Lykke.Job.TradeDataAggregator
             app.UseMvc();
             app.UseSwagger();
             app.UseSwaggerUi();
+            app.UseStaticFiles();
 
-            appLifetime.ApplicationStopped.Register(() =>
-            {
-                ApplicationContainer.Dispose();
-            });
+            appLifetime.ApplicationStarted.Register(Start);
+            appLifetime.ApplicationStopping.Register(StopApplication);
+            appLifetime.ApplicationStopped.Register(CleanUp);
+        }
+
+        private void Start()
+        {
+            _triggerHost = new TriggerHost(new AutofacServiceProvider(ApplicationContainer));
+            _triggerHostTask = _triggerHost.Start();
+        }
+
+        private void StopApplication()
+        {
+            _triggerHost?.Cancel();
+            _triggerHostTask?.Wait();
+        }
+
+        private void CleanUp()
+        {
+            ApplicationContainer.Dispose();
         }
 
         private static ILog CreateLogWithSlack(IServiceCollection services, AppSettings settings)
@@ -99,8 +123,10 @@ namespace Lykke.Job.TradeDataAggregator
             // Creating azure storage logger, which logs own messages to concole log
             if (!string.IsNullOrEmpty(dbLogConnectionString) && !(dbLogConnectionString.StartsWith("${") && dbLogConnectionString.EndsWith("}")))
             {
-                logToAzureStorage = new LykkeLogToAzureStorage("Lykke.Job.TradeDataAggregator", new AzureTableStorage<LogEntity>(
-                    dbLogConnectionString, "TradeDataAggregatorLog", logToConsole));
+                var persistanceManager = new LykkeLogToAzureStoragePersistenceManager(AppName,
+                    AzureTableStorage<LogEntity>.Create(() => dbLogConnectionString, "TradeDataAggregatorLog", logToConsole));
+
+                logToAzureStorage = new LykkeLogToAzureStorage(AppName, persistanceManager, lastResortLog: logToConsole);
 
                 logAggregate.AddLogger(logToAzureStorage);
             }
@@ -117,7 +143,10 @@ namespace Lykke.Job.TradeDataAggregator
             }, log);
 
             // Finally, setting slack notification for azure storage log, which will forward necessary message to slack service
-            logToAzureStorage?.SetSlackNotification(slackService);
+            logToAzureStorage?.SetSlackNotificationsManager(
+                new LykkeLogToAzureSlackNotificationsManager(AppName, slackService, logToConsole));
+
+            logToAzureStorage?.Start();
 
             return log;
         }
