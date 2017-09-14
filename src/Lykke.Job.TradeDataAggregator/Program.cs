@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Net.WebSockets;
 using System.Runtime.Loader;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,25 +13,14 @@ namespace Lykke.Job.TradeDataAggregator
     {
         static void Main(string[] args)
         {
-            var webHostCancellationTokenSource = new CancellationTokenSource();
-            IWebHost webHost = null;
-            TriggerHost triggerHost = null;
-            Task webHostTask = null;
-            Task triggerHostTask = null;
-            var end = new ManualResetEvent(false);
+            Console.WriteLine($"TradeDataAggregator version: { Microsoft.Extensions.PlatformAbstractions.PlatformServices.Default.Application.ApplicationVersion}");
+#if DEBUG
+            Console.WriteLine("Is DEBUG");
+#else
+            Console.WriteLine("Is RELEASE");
+#endif
 
-            try
-            {
-                AssemblyLoadContext.Default.Unloading += ctx =>
-                {
-                    Console.WriteLine("SIGTERM recieved");
-
-                    webHostCancellationTokenSource.Cancel();
-
-                    end.WaitOne();
-                };
-
-                webHost = new WebHostBuilder()
+            var webHost = new WebHostBuilder()
                     .UseKestrel()
                     .UseUrls("http://*:5000")
                     .UseContentRoot(Directory.GetCurrentDirectory())
@@ -38,27 +28,9 @@ namespace Lykke.Job.TradeDataAggregator
                     .UseApplicationInsights()
                     .Build();
 
-                triggerHost = new TriggerHost(webHost.Services);
+            webHost.Run();
 
-                webHostTask = webHost.RunAsync(webHostCancellationTokenSource.Token);
-                triggerHostTask = triggerHost.Start();
-
-                // WhenAny to handle any task termination with exception, 
-                // or gracefully termination of webHostTask
-                Task.WhenAny(webHostTask, triggerHostTask).Wait();
-            }
-            finally
-            {
-                Console.WriteLine("Terminating...");
-
-                webHostCancellationTokenSource.Cancel();
-                triggerHost?.Cancel();
-
-                webHostTask?.Wait();
-                triggerHostTask?.Wait();
-
-                end.Set();
-            }
+            Console.WriteLine("Terminated");
         }
     }
 }

@@ -3,17 +3,16 @@ using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using AzureStorage.Tables;
 using Common.Log;
-using Lykke.Job.TradeDataAggregator.AzureRepositories.CacheOperations;
 using Lykke.Job.TradeDataAggregator.AzureRepositories.Exchange;
 using Lykke.Job.TradeDataAggregator.AzureRepositories.Feed;
 using Lykke.Job.TradeDataAggregator.Core;
-using Lykke.Job.TradeDataAggregator.Core.Domain.CacheOperations;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Feed;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Service.Assets.Client.Custom;
 using Microsoft.Extensions.DependencyInjection;
 using Lykke.Job.TradeDataAggregator.Services;
+using Lykke.Service.OperationsRepository.Client;
 
 namespace Lykke.Job.TradeDataAggregator.Modules
 {
@@ -56,6 +55,9 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             RegisterAzureRepositories(builder, _settings.TradeDataAggregatorJob.Db, _log);
 
+            builder.RegisterOperationsRepositoryClients(_settings.OperationsRepositoryClient.ServiceUrl, _log,
+                _settings.OperationsRepositoryClient.RequestTimeout);
+
             builder.Populate(_services);
         }
 
@@ -68,10 +70,6 @@ namespace Lykke.Job.TradeDataAggregator.Modules
             container.RegisterInstance<ITradesCommonRepository>(
                 new TradesCommonRepository(
                     new AzureTableStorage<TradeCommonEntity>(dbSettings.HTradesConnString, "TradesCommon", log)));
-
-            container.RegisterInstance<IClientTradesRepository>(
-                new ClientTradesRepository(
-                    new AzureTableStorage<ClientTradeEntity>(dbSettings.HTradesConnString, "Trades", log)));
 
             container.RegisterInstance<IAssetPairBestPriceRepository>(
                 new AssetPairBestPriceRepository(
