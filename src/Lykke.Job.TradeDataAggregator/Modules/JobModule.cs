@@ -67,6 +67,10 @@ namespace Lykke.Job.TradeDataAggregator.Modules
                 new MarketDataRepository(
                     new AzureTableStorage<MarketDataEntity>(dbSettings.HTradesConnString, "MarketsData", log)));
 
+            container.RegisterInstance<ITradesCommonRepository>(
+                new TradesCommonRepository(
+                    new AzureTableStorage<TradeCommonEntity>(dbSettings.HTradesConnString, "TradesCommon", log)));
+
             container.RegisterInstance<IAssetPairBestPriceRepository>(
                 new AssetPairBestPriceRepository(
                     new AzureTableStorage<FeedDataEntity>(dbSettings.HLiquidityConnString, "MarketProfile", log)));
