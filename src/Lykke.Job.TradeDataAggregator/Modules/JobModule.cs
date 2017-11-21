@@ -33,44 +33,31 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterInstance(_settings.CurrentValue.TradeDataAggregatorJob)
-                .SingleInstance();
-
             builder.RegisterInstance(_log)
                 .As<ILog>()
                 .SingleInstance();
 
-            builder.RegisterType<HealthService>()
-                .As<IHealthService>()
-                .SingleInstance()
-                .WithParameter(TypedParameter.From(_settings.CurrentValue.TradeDataAggregatorJob.MaxHealthyClientScanningDuration));
-
-            builder.RegisterType<TradeDataAggregationService>().As<ITradeDataAggregationService>();
+            builder.RegisterInfrastructureServices(_settings.Nested(x => x.TradeDataAggregatorJob));
 
             _services.RegisterAssetsClient(new AssetServiceSettings
             {
                 BaseUri = new Uri(_settings.CurrentValue.Assets.ServiceUrl)
             });
 
-            RegisterAzureRepositories(builder, _settings.Nested(x => x.TradeDataAggregatorJob.Db), _log);
+            builder.RegisterAzureRepositories(_settings.Nested(x => x.TradeDataAggregatorJob.Db), _log);
 
-            builder.RegisterInstance(_settings.CurrentValue.RabbitMq).SingleInstance();
+            builder.RegisterRabbitMq(_settings.Nested(x => x.RabbitMq));
 
-            builder.RegisterType<RabbitMqHandler>()
-                .AsSelf()
-                .As<IStartable>()
-                .SingleInstance();
-
-            builder.RegisterType<StartupManager>()
-                .As<IStartupManager>();
-
-            builder.RegisterType<ShutdownManager>()
-                .As<IShutdownManager>();
+            builder.RegisterApplicationServices();
 
             builder.Populate(_services);
         }
+    }
 
-        private static void RegisterAzureRepositories(ContainerBuilder container, IReloadingManager<AppSettings.DbSettings> dbSettings, ILog log)
+    public static class Extensions
+    {
+        public static void RegisterAzureRepositories(this ContainerBuilder container,
+            IReloadingManager<AppSettings.DbSettings> dbSettings, ILog log)
         {
             container.RegisterInstance<IMarketDataRepository>(new MarketDataRepository(
                 AzureTableStorage<MarketDataEntity>.Create(dbSettings.ConnectionString(x => x.HTradesConnString),
@@ -87,6 +74,37 @@ namespace Lykke.Job.TradeDataAggregator.Modules
             container.RegisterInstance<IAssetPairBestPriceRepository>(new AssetPairBestPriceRepository(
                 AzureTableStorage<FeedDataEntity>.Create(dbSettings.ConnectionString(x => x.HLiquidityConnString),
                     "MarketProfile", log)));
+        }
+
+        public static void RegisterRabbitMq(this ContainerBuilder container,
+            IReloadingManager<AppSettings.RabbitMqSettings> settings)
+        {
+            container.RegisterInstance(settings.CurrentValue).SingleInstance();
+
+            container.RegisterType<RabbitMqHandler>()
+                .AsSelf()
+                .As<IStartable>()
+                .SingleInstance();
+        }
+
+        public static void RegisterInfrastructureServices(this ContainerBuilder container,
+            IReloadingManager<AppSettings.TradeDataAggregatorSettings> settings)
+        {
+            container.RegisterType<HealthService>()
+                .As<IHealthService>()
+                .SingleInstance()
+                .WithParameter(TypedParameter.From(settings.CurrentValue.MaxHealthyClientScanningDuration));
+
+            container.RegisterType<StartupManager>()
+                .As<IStartupManager>();
+
+            container.RegisterType<ShutdownManager>()
+                .As<IShutdownManager>();
+        }
+
+        public static void RegisterApplicationServices(this ContainerBuilder container)
+        {
+            container.RegisterType<TradeDataAggregationService>().As<ITradeDataAggregationService>();
         }
     }
 }

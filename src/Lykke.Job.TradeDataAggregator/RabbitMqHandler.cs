@@ -46,7 +46,8 @@ namespace Lykke.Job.TradeDataAggregator
                 QueueName = $"{_rabbitMqSettings.ExchangeSwap}-tradedataaggregator",
             };
 
-            _tradesSubscriber = new RabbitMqSubscriber<TradeQueueItem>(rabbitSettings, new DeadQueueErrorHandlingStrategy(_log, rabbitSettings))
+            _tradesSubscriber = new RabbitMqSubscriber<TradeQueueItem>(rabbitSettings,
+                    new DeadQueueErrorHandlingStrategy(_log, rabbitSettings))
                 .SetMessageDeserializer(new JsonDeserializer<TradeQueueItem>())
                 .SetMessageReadStrategy(new MessageReadWithTemporaryQueueStrategy())
                 .SetLogger(_log)
@@ -68,15 +69,18 @@ namespace Lykke.Job.TradeDataAggregator
             }
 
             var assetPair = await _assetsService.TryGetAssetPairAsync(message.Order.AssetPairId);
-            if (assetPair == null) throw new ArgumentNullException(nameof(assetPair));
-
-            bool isLimitAssetBase = message.Trades.First().LimitAsset == assetPair.BaseAssetId;
+            if (assetPair == null)
+                throw new ArgumentNullException(nameof(assetPair));
 
             var limitAsset = await _assetsService.TryGetAssetAsync(message.Trades.First().LimitAsset);
-            if (limitAsset == null) throw new ArgumentNullException(nameof(limitAsset));
+            if (limitAsset == null)
+                throw new ArgumentNullException(nameof(limitAsset));
 
             var marketAsset = await _assetsService.TryGetAssetAsync(message.Trades.First().MarketAsset);
-            if (marketAsset == null) throw new ArgumentNullException(nameof(marketAsset));
+            if (marketAsset == null)
+                throw new ArgumentNullException(nameof(marketAsset));
+
+            bool isLimitAssetBase = message.Trades.First().LimitAsset == assetPair.BaseAssetId;
 
             foreach (var trade in message.Trades)
             {
