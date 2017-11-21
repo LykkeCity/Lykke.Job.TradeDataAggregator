@@ -3,7 +3,7 @@ using System.Net;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Job.TradeDataAggregator.Models;
 using Microsoft.AspNetCore.Mvc;
-using Swashbuckle.SwaggerGen.Annotations;
+using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace Lykke.Job.TradeDataAggregator.Controllers
 {
