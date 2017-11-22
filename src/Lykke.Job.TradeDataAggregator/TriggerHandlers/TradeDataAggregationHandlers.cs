@@ -9,7 +9,8 @@ namespace Lykke.Job.TradeDataAggregator.TriggerHandlers
         private readonly ITradeDataAggregationService _tradeDataAggregationService;
         private readonly IHealthService _healthService;
 
-        public TradeDataAggregationHandlers(ITradeDataAggregationService tradeDataAggregationService, IHealthService healthService)
+        public TradeDataAggregationHandlers(ITradeDataAggregationService tradeDataAggregationService,
+            IHealthService healthService)
         {
             _tradeDataAggregationService = tradeDataAggregationService;
             _healthService = healthService;

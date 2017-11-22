@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using Lykke.Job.TradeDataAggregator.Core.Domain.Health;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 
 namespace Lykke.Job.TradeDataAggregator.Services
@@ -72,6 +74,23 @@ namespace Lykke.Job.TradeDataAggregator.Services
             }
 
             return null;
+        }
+
+        public IEnumerable<HealthIssue> GetHealthIssues()
+        {
+            var issues = new HealthIssuesCollection();
+
+            issues.Add(nameof(LastClientsScanningStartedMoment), LastClientsScanningStartedMoment.ToString());
+            issues.Add(nameof(LastClientsScanningDuration), LastClientsScanningDuration.ToString());
+            issues.Add(nameof(MaxHealthyClientsScanningDuration), MaxHealthyClientsScanningDuration.ToString());
+
+            var warningMessage = GetHealthWarningMessage();
+            if (!string.IsNullOrWhiteSpace(warningMessage))
+            {
+                issues.Add(nameof(warningMessage), warningMessage);
+            }
+
+            return issues;
         }
     }
 }
