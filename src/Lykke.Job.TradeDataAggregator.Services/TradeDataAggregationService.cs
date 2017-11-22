@@ -9,7 +9,7 @@ using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Feed;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Service.Assets.Client;
-using Lykke.Service.Assets.Client.Custom;
+using Lykke.Service.Assets.Client.Models;
 
 namespace Lykke.Job.TradeDataAggregator.Services
 {
@@ -34,7 +34,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
         private readonly IClientTradesRepository _clientTradesRepository;
         private readonly IMarketDataRepository _marketDataRepository;
-        private readonly IAssetsservice _assetsService;
+        private readonly IAssetsServiceWithCache _assetsService;
         private readonly ILog _log;
         private readonly MarketProfile _marketProfile;
 
@@ -43,7 +43,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
         public TradeDataAggregationService(
             IClientTradesRepository clientTradesRepository,
             IMarketDataRepository marketDataRepository,
-            IAssetsservice assetsService,
+            IAssetsServiceWithCache assetsService,
             IAssetPairBestPriceRepository assetPairBestPriceRepository,
             ILog log)
         {
@@ -64,7 +64,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
         private async Task FillMarketData()
         {
             var newMarketData = new Dictionary<string, IMarketData>();
-            var assetPairs = await _assetsService.GetAssetPairsAsync();
+            var assetPairs = await _assetsService.GetAllAssetPairsAsync();
             var tempDataValues = _tempDataByLimitOrderAndDtId.Values.OrderBy(x => x.Dt);
 
             foreach (var record in tempDataValues)
@@ -104,7 +104,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
             await _marketDataRepository.AddOrMergeMarketData(newMarketData.Values);
         }
 
-        private static IAssetPair FindPairWithAssets(IEnumerable<IAssetPair> src, string assetId1, string assetId2)
+        private static AssetPair FindPairWithAssets(IEnumerable<AssetPair> src, string assetId1, string assetId2)
         {
             return src.FirstOrDefault(assetPair =>
                 assetPair.BaseAssetId == assetId1 && assetPair.QuotingAssetId == assetId2 ||
@@ -112,7 +112,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
             );
         }
 
-        private static bool IsInvertedTarget(IAssetPair assetPair, string targetAsset)
+        private static bool IsInvertedTarget(AssetPair assetPair, string targetAsset)
         {
             return assetPair.QuotingAssetId == targetAsset;
         }
