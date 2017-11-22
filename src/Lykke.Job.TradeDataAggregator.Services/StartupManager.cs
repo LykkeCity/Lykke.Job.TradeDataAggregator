@@ -14,17 +14,21 @@ namespace Lykke.Job.TradeDataAggregator.Services
     public class StartupManager : IStartupManager
     {
         private readonly ILog _log;
+        private readonly IScanClientsHandler _scanClientsHandler;
 
-        public StartupManager(ILog log)
+        public StartupManager(ILog log, IScanClientsHandler scanClientsHandler)
         {
             _log = log;
+            _scanClientsHandler = scanClientsHandler;
         }
 
         public async Task StartAsync()
         {
-            // TODO: Implement your startup logic here. Good idea is to log every step
+            await _log.WriteInfoAsync(nameof(StartAsync), "", "Starting scan clients handler");
 
-            await Task.CompletedTask;
+            _scanClientsHandler.Start();
+
+            await _log.WriteInfoAsync(nameof(StartAsync), "", "Started up");
         }
     }
 }

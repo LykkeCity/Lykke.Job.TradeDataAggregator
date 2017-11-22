@@ -48,6 +48,8 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             builder.RegisterApplicationServices(_settings.Nested(x => x.TradeDataAggregatorJob));
 
+            builder.RegisterHandlers();
+
             builder.Populate(_services);
         }
     }
@@ -100,6 +102,13 @@ namespace Lykke.Job.TradeDataAggregator.Modules
                 .As<IShutdownManager>();
 
             container.RegisterType<TradeDataAggregationService>().As<ITradeDataAggregationService>();
+        }
+
+        public static void RegisterHandlers(this ContainerBuilder container)
+        {
+            container.RegisterType<ScanClientsHandler>()
+                .As<IScanClientsHandler>()
+                .SingleInstance();
         }
     }
 }
