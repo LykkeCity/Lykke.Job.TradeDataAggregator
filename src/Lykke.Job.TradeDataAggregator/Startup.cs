@@ -118,7 +118,7 @@ namespace Lykke.Job.TradeDataAggregator
                 // NOTE: Job not yet recieve and process IsAlive requests here
 
                 await ApplicationContainer.Resolve<IStartupManager>().StartAsync();
-                await Log.WriteMonitorAsync("", "", "Started");
+                await Log.WriteMonitorAsync("", Program.EnvInfo, "Started");
             }
             catch (Exception ex)
             {
@@ -153,7 +153,7 @@ namespace Lykke.Job.TradeDataAggregator
 
                 if (Log != null)
                 {
-                    await Log.WriteMonitorAsync("", "", "Terminating");
+                    await Log.WriteMonitorAsync("", Program.EnvInfo, "Terminating");
                 }
 
                 ApplicationContainer.Dispose();

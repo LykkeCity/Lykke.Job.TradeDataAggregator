@@ -37,8 +37,6 @@ namespace Lykke.Job.TradeDataAggregator.Modules
                 .As<ILog>()
                 .SingleInstance();
 
-            builder.RegisterInfrastructureServices(_settings.Nested(x => x.TradeDataAggregatorJob));
-
             _services.RegisterAssetsClient(new AssetServiceSettings
             {
                 BaseUri = new Uri(_settings.CurrentValue.Assets.ServiceUrl)
@@ -48,7 +46,7 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             builder.RegisterRabbitMq(_settings.Nested(x => x.RabbitMq));
 
-            builder.RegisterApplicationServices();
+            builder.RegisterApplicationServices(_settings.Nested(x => x.TradeDataAggregatorJob));
 
             builder.Populate(_services);
         }
@@ -87,7 +85,7 @@ namespace Lykke.Job.TradeDataAggregator.Modules
                 .SingleInstance();
         }
 
-        public static void RegisterInfrastructureServices(this ContainerBuilder container,
+        public static void RegisterApplicationServices(this ContainerBuilder container,
             IReloadingManager<AppSettings.TradeDataAggregatorSettings> settings)
         {
             container.RegisterType<HealthService>()
@@ -100,10 +98,7 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             container.RegisterType<ShutdownManager>()
                 .As<IShutdownManager>();
-        }
 
-        public static void RegisterApplicationServices(this ContainerBuilder container)
-        {
             container.RegisterType<TradeDataAggregationService>().As<ITradeDataAggregationService>();
         }
     }
