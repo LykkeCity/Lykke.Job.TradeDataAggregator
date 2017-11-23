@@ -78,12 +78,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
         public IEnumerable<HealthIssue> GetHealthIssues()
         {
-            var issues = new HealthIssuesCollection
-            {
-                { nameof(LastClientsScanningStartedMoment), LastClientsScanningStartedMoment.ToString() },
-                { nameof(LastClientsScanningDuration), LastClientsScanningDuration.ToString() },
-                { nameof(MaxHealthyClientsScanningDuration), MaxHealthyClientsScanningDuration.ToString() }
-            };
+            var issues = new HealthIssuesCollection();
 
             var warningMessage = GetHealthWarningMessage();
             if (!string.IsNullOrWhiteSpace(warningMessage))

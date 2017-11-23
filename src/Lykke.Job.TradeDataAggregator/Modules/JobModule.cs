@@ -20,13 +20,15 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 {
     public class JobModule : Module
     {
-        private readonly IReloadingManager<AppSettings> _settings;
+        private readonly AppSettings _settings;
+        private readonly IReloadingManager<AppSettings.DbSettings> _dbSettings;
         private readonly ILog _log;
         private readonly ServiceCollection _services;
 
-        public JobModule(IReloadingManager<AppSettings> settings, ILog log)
+        public JobModule(IReloadingManager<AppSettings.DbSettings> dbSettings, AppSettings settings, ILog log)
         {
             _settings = settings;
+            _dbSettings = dbSettings;
             _log = log;
             _services = new ServiceCollection();
         }
@@ -39,14 +41,14 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             _services.RegisterAssetsClient(new AssetServiceSettings
             {
-                BaseUri = new Uri(_settings.CurrentValue.Assets.ServiceUrl)
+                BaseUri = new Uri(_settings.Assets.ServiceUrl)
             });
 
-            builder.RegisterAzureRepositories(_settings.Nested(x => x.TradeDataAggregatorJob.Db), _log);
+            builder.RegisterAzureRepositories(_dbSettings, _log);
 
-            builder.RegisterRabbitMq(_settings.Nested(x => x.RabbitMq));
+            builder.RegisterRabbitMq(_settings.RabbitMq);
 
-            builder.RegisterApplicationServices(_settings.Nested(x => x.TradeDataAggregatorJob));
+            builder.RegisterApplicationServices(_settings.TradeDataAggregatorJob);
 
             builder.RegisterHandlers();
 
@@ -77,9 +79,9 @@ namespace Lykke.Job.TradeDataAggregator.Modules
         }
 
         public static void RegisterRabbitMq(this ContainerBuilder container,
-            IReloadingManager<AppSettings.RabbitMqSettings> settings)
+            AppSettings.RabbitMqSettings settings)
         {
-            container.RegisterInstance(settings.CurrentValue).SingleInstance();
+            container.RegisterInstance(settings).SingleInstance();
 
             container.RegisterType<RabbitMqHandler>()
                 .AsSelf()
@@ -88,12 +90,12 @@ namespace Lykke.Job.TradeDataAggregator.Modules
         }
 
         public static void RegisterApplicationServices(this ContainerBuilder container,
-            IReloadingManager<AppSettings.TradeDataAggregatorSettings> settings)
+            AppSettings.TradeDataAggregatorSettings settings)
         {
             container.RegisterType<HealthService>()
                 .As<IHealthService>()
                 .SingleInstance()
-                .WithParameter(TypedParameter.From(settings.CurrentValue.MaxHealthyClientScanningDuration));
+                .WithParameter(TypedParameter.From(settings.MaxHealthyClientScanningDuration));
 
             container.RegisterType<StartupManager>()
                 .As<IStartupManager>();

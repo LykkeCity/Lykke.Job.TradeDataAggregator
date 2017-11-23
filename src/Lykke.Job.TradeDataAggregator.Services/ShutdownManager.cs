@@ -12,17 +12,21 @@ namespace Lykke.Job.TradeDataAggregator.Services
     public class ShutdownManager : IShutdownManager
     {
         private readonly ILog _log;
+        private readonly IScanClientsHandler _scanClientsHandler;
 
-        public ShutdownManager(ILog log)
+        public ShutdownManager(ILog log, IScanClientsHandler scanClientsHandler)
         {
             _log = log;
+            _scanClientsHandler = scanClientsHandler;
         }
 
         public async Task StopAsync()
         {
-            // TODO: Implement your shutdown logic here. Good idea is to log every step
+            await _log.WriteInfoAsync(nameof(StopAsync), "", "Stopping scan clients handler");
 
-            await Task.CompletedTask;
+            _scanClientsHandler.Stop();
+
+            await _log.WriteInfoAsync(nameof(StopAsync), "", "Stopped");
         }
     }
 }

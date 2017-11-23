@@ -15,7 +15,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Lykke.Job.TradeDataAggregator.Core;
-using Lykke.JobTriggers.Extenstions;
 using System.Threading.Tasks;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 
@@ -63,9 +62,8 @@ namespace Lykke.Job.TradeDataAggregator
 
                 Log = CreateLogWithSlack(services, appSettings);
 
-                builder.RegisterModule(new JobModule(appSettings, Log));
-
-                builder.AddTriggers();
+                builder.RegisterModule(new JobModule(appSettings.Nested(x => x.TradeDataAggregatorJob.Db),
+                    appSettings.CurrentValue, Log));
 
                 builder.Populate(services);
 
