@@ -287,3 +287,4 @@ __pycache__/
 *.odx.cs
 *.xsd.cs
 /src/Lykke.Job.TradeDataAggregator/appsettings.Development.json
+UseDevelopmentStorage=true

@@ -3,7 +3,8 @@ using System.Net;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Job.TradeDataAggregator.Models;
 using Microsoft.AspNetCore.Mvc;
-using Swashbuckle.SwaggerGen.Annotations;
+using Swashbuckle.AspNetCore.SwaggerGen;
+using System.Linq;
 
 namespace Lykke.Job.TradeDataAggregator.Controllers
 {
@@ -23,8 +24,8 @@ namespace Lykke.Job.TradeDataAggregator.Controllers
         /// <returns></returns>
         [HttpGet]
         [SwaggerOperation("IsAlive")]
-        [ProducesResponseType(typeof(IsAliveResponse), (int)HttpStatusCode.OK)]
-        [ProducesResponseType(typeof(ErrorResponse), (int)HttpStatusCode.InternalServerError)]
+        [ProducesResponseType(typeof(IsAliveResponse), (int) HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ErrorResponse), (int) HttpStatusCode.InternalServerError)]
         public IActionResult Get()
         {
             var healthViloationMessage = _healthService.GetHealthViolationMessage();
@@ -38,12 +39,16 @@ namespace Lykke.Job.TradeDataAggregator.Controllers
 
             return Ok(new IsAliveResponse
             {
-                Version = Microsoft.Extensions.PlatformAbstractions.PlatformServices.Default.Application.ApplicationVersion,
-                Env = Environment.GetEnvironmentVariable("ENV_INFO"),
-                LastClientsScanningStartedMoment = _healthService.LastClientsScanningStartedMoment,
-                LastClientsScanningDuration = _healthService.LastClientsScanningDuration,
-                MaxHealthyClientsScanningDuration = _healthService.MaxHealthyClientsScanningDuration,
-                HealthWarning = _healthService.GetHealthWarningMessage() ?? "No"
+                Name = Microsoft.Extensions.PlatformAbstractions.PlatformServices.Default.Application.ApplicationName,
+                Version = Microsoft.Extensions.PlatformAbstractions.PlatformServices.Default.Application
+                    .ApplicationVersion,
+                Env = Program.EnvInfo,
+                IssueIndicators = _healthService.GetHealthIssues()
+                    .Select(i => new IsAliveResponse.IssueIndicator
+                    {
+                        Type = i.Type,
+                        Value = i.Value
+                    })
             });
         }
     }

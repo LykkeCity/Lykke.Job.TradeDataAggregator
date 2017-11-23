@@ -10,7 +10,6 @@ using Lykke.Job.TradeDataAggregator.Services.Models;
 using Lykke.RabbitMqBroker;
 using Lykke.RabbitMqBroker.Subscriber;
 using Lykke.Service.Assets.Client;
-using Lykke.Service.Assets.Client.Models;
 using Newtonsoft.Json;
 
 namespace Lykke.Job.TradeDataAggregator
@@ -19,13 +18,13 @@ namespace Lykke.Job.TradeDataAggregator
     {
         private readonly AppSettings.RabbitMqSettings _rabbitMqSettings;
         private readonly ITradesCommonRepository _tradesCommonRepository;
-        private readonly IAssetsservice _assetsService;
+        private readonly IAssetsServiceWithCache _assetsService;
         private readonly ILog _log;
         private RabbitMqSubscriber<TradeQueueItem> _tradesSubscriber;
 
         public RabbitMqHandler(AppSettings.RabbitMqSettings rabbitMqSettings,
             ITradesCommonRepository tradesCommonRepository,
-            IAssetsservice assetsService,
+            IAssetsServiceWithCache assetsService,
             ILog log)
         {
             _rabbitMqSettings = rabbitMqSettings;
@@ -47,7 +46,8 @@ namespace Lykke.Job.TradeDataAggregator
                 QueueName = $"{_rabbitMqSettings.ExchangeSwap}-tradedataaggregator",
             };
 
-            _tradesSubscriber = new RabbitMqSubscriber<TradeQueueItem>(rabbitSettings, new DeadQueueErrorHandlingStrategy(_log, rabbitSettings))
+            _tradesSubscriber = new RabbitMqSubscriber<TradeQueueItem>(rabbitSettings,
+                    new DeadQueueErrorHandlingStrategy(_log, rabbitSettings))
                 .SetMessageDeserializer(new JsonDeserializer<TradeQueueItem>())
                 .SetMessageReadStrategy(new MessageReadWithTemporaryQueueStrategy())
                 .SetLogger(_log)
@@ -68,17 +68,19 @@ namespace Lykke.Job.TradeDataAggregator
                 return;
             }
 
-            var pair = await _assetsService.GetAssetPairAsync(message.Order.AssetPairId) as AssetPairResponseModel;
+            var assetPair = await _assetsService.TryGetAssetPairAsync(message.Order.AssetPairId);
+            if (assetPair == null)
+                throw new ArgumentNullException(nameof(assetPair));
 
-            if (pair == null) throw new ArgumentNullException(nameof(pair));
+            var limitAsset = await _assetsService.TryGetAssetAsync(message.Trades.First().LimitAsset);
+            if (limitAsset == null)
+                throw new ArgumentNullException(nameof(limitAsset));
 
-            bool isLimitAssetBase = message.Trades.First().LimitAsset == pair.BaseAssetId;
+            var marketAsset = await _assetsService.TryGetAssetAsync(message.Trades.First().MarketAsset);
+            if (marketAsset == null)
+                throw new ArgumentNullException(nameof(marketAsset));
 
-            var limitAsset = await _assetsService.GetAssetAsync(message.Trades.First().LimitAsset) as AssetResponseModel;
-            if (limitAsset == null) throw new ArgumentNullException(nameof(limitAsset));
-
-            var marketAsset = await _assetsService.GetAssetAsync(message.Trades.First().MarketAsset) as AssetResponseModel;
-            if (marketAsset == null) throw new ArgumentNullException(nameof(marketAsset));
+            bool isLimitAssetBase = message.Trades.First().LimitAsset == assetPair.BaseAssetId;
 
             foreach (var trade in message.Trades)
             {

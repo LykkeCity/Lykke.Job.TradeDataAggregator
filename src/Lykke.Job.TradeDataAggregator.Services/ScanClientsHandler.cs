@@ -1,22 +1,25 @@
-﻿using System.Threading.Tasks;
+﻿using Common;
 using Lykke.Job.TradeDataAggregator.Core.Services;
-using Lykke.JobTriggers.Triggers.Attributes;
+using System;
+using System.Threading.Tasks;
+using Common.Log;
 
-namespace Lykke.Job.TradeDataAggregator.TriggerHandlers
+namespace Lykke.Job.TradeDataAggregator.Services
 {
-    public class TradeDataAggregationHandlers
+    public class ScanClientsHandler : TimerPeriod, IScanClientsHandler
     {
         private readonly ITradeDataAggregationService _tradeDataAggregationService;
         private readonly IHealthService _healthService;
 
-        public TradeDataAggregationHandlers(ITradeDataAggregationService tradeDataAggregationService, IHealthService healthService)
+        public ScanClientsHandler(ITradeDataAggregationService tradeDataAggregationService,
+            IHealthService healthService, ILog log) : base(nameof(ScanClientsHandler),
+            (int)TimeSpan.FromSeconds(30).TotalMilliseconds, log)
         {
             _tradeDataAggregationService = tradeDataAggregationService;
             _healthService = healthService;
         }
 
-        [TimerTrigger("00:00:30")]
-        public async Task ScanClients()
+        public override async Task Execute()
         {
             try
             {

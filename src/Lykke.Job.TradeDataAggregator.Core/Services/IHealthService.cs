@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Lykke.Job.TradeDataAggregator.Core.Domain.Health;
+using System;
+using System.Collections.Generic;
 
 namespace Lykke.Job.TradeDataAggregator.Core.Services
 {
@@ -13,5 +15,6 @@ namespace Lykke.Job.TradeDataAggregator.Core.Services
         void TraceClientsScanningFailed();
         string GetHealthViolationMessage();
         string GetHealthWarningMessage();
+        IEnumerable<HealthIssue> GetHealthIssues();
     }
 }

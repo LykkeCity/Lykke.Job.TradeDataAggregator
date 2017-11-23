@@ -1,44 +1,39 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.Loader;
-using System.Threading.Tasks;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using AzureStorage.Tables;
-using Common;
 using Common.Log;
 using Lykke.Common.ApiLibrary.Middleware;
 using Lykke.Common.ApiLibrary.Swagger;
-using Lykke.Job.TradeDataAggregator.Core;
 using Lykke.Job.TradeDataAggregator.Models;
 using Lykke.Job.TradeDataAggregator.Modules;
-using Lykke.Job.TradeDataAggregator.Services.Models;
-using Lykke.JobTriggers.Extenstions;
 using Lykke.Logs;
-using Lykke.RabbitMqBroker;
-using Lykke.RabbitMqBroker.Subscriber;
 using Lykke.SettingsReader;
 using Lykke.SlackNotification.AzureQueue;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Lykke.Job.TradeDataAggregator.Core;
+using System.Threading.Tasks;
+using Lykke.Job.TradeDataAggregator.Core.Services;
 
 namespace Lykke.Job.TradeDataAggregator
 {
     public class Startup
     {
+        public string ApiVersion => "1.0";
+        public string ApiTitle => "Lykke TradeDataAggregator Job";
+
         public IHostingEnvironment Environment { get; }
         public IContainer ApplicationContainer { get; set; }
         public IConfigurationRoot Configuration { get; }
+        public ILog Log { get; private set; }
 
         public Startup(IHostingEnvironment env)
         {
             var builder = new ConfigurationBuilder()
                 .SetBasePath(env.ContentRootPath)
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
                 .AddEnvironmentVariables();
 
             Configuration = builder.Build();
@@ -47,95 +42,168 @@ namespace Lykke.Job.TradeDataAggregator
 
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc()
-                .AddJsonOptions(options =>
+            try
+            {
+                services.AddMvc()
+                    .AddJsonOptions(options =>
+                    {
+                        options.SerializerSettings.ContractResolver =
+                            new Newtonsoft.Json.Serialization.DefaultContractResolver();
+                    });
+
+                services.AddSwaggerGen(options =>
                 {
-                    options.SerializerSettings.ContractResolver =
-                        new Newtonsoft.Json.Serialization.DefaultContractResolver();
+                    options.DefaultLykkeConfiguration(ApiVersion, ApiTitle);
                 });
 
-            services.AddSwaggerGen(options =>
+                var builder = new ContainerBuilder();
+
+                var appSettings = Configuration.LoadSettings<AppSettings>();
+
+                Log = CreateLogWithSlack(services, appSettings);
+
+                builder.RegisterModule(new JobModule(appSettings.Nested(x => x.TradeDataAggregatorJob.Db),
+                    appSettings.CurrentValue, Log));
+
+                builder.Populate(services);
+
+                ApplicationContainer = builder.Build();
+
+                return new AutofacServiceProvider(ApplicationContainer);
+            }
+            catch (Exception ex)
             {
-                options.DefaultLykkeConfiguration("v1", "TradeDataAggregator API");
-            });
-
-            var builder = new ContainerBuilder();
-            var appSettings = Environment.IsDevelopment()
-                ? Configuration.Get<AppSettings>()
-                : HttpSettingsLoader.Load<AppSettings>(Configuration.GetValue<string>("SettingsUrl"));
-            var log = CreateLogWithSlack(services, appSettings);
-
-            builder.RegisterModule(new JobModule(appSettings, log));
-            builder.AddTriggers();
-
-            builder.RegisterInstance(appSettings.RabbitMq).SingleInstance();
-
-            builder.RegisterType<RabbitMqHandler>()
-                .AsSelf()
-                .As<IStartable>()
-                .SingleInstance();
-
-            builder.Populate(services);
-
-            ApplicationContainer = builder.Build();
-
-            return new AutofacServiceProvider(ApplicationContainer);
+                Log?.WriteFatalErrorAsync(nameof(Startup), nameof(ConfigureServices), "", ex).Wait();
+                throw;
+            }
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env, IApplicationLifetime appLifetime)
         {
-            if (env.IsDevelopment())
+            try
             {
-                app.UseDeveloperExceptionPage();
+                if (env.IsDevelopment())
+                {
+                    app.UseDeveloperExceptionPage();
+                }
+
+                app.UseLykkeMiddleware("TradeDataAggregator",
+                    ex => new ErrorResponse {ErrorMessage = "Technical problem"});
+
+                app.UseMvc();
+                app.UseSwagger();
+                app.UseSwaggerUI(o =>
+                {
+                    o.SwaggerEndpoint($"/swagger/{ApiVersion}/swagger.json", ApiTitle);
+                });
+                app.UseStaticFiles();
+
+                appLifetime.ApplicationStarted.Register(() => StartApplication().Wait());
+                appLifetime.ApplicationStopping.Register(() => StopApplication().Wait());
+                appLifetime.ApplicationStopped.Register(() => CleanUp().Wait());
             }
-
-            app.UseLykkeMiddleware("TradeDataAggregator", ex => new ErrorResponse { ErrorMessage = "Technical problem" });
-
-            app.UseMvc();
-            app.UseSwagger();
-            app.UseSwaggerUi();
-
-            appLifetime.ApplicationStopped.Register(() =>
+            catch (Exception ex)
             {
-                ApplicationContainer.Dispose();
-            });
+                Log?.WriteFatalErrorAsync(nameof(Startup), nameof(Configure), "", ex).Wait();
+                throw;
+            }
         }
 
-        private static ILog CreateLogWithSlack(IServiceCollection services, AppSettings settings)
+        private async Task StartApplication()
         {
-            LykkeLogToAzureStorage logToAzureStorage = null;
-
-            var logToConsole = new LogToConsole();
-            var logAggregate = new LogAggregate();
-
-            logAggregate.AddLogger(logToConsole);
-
-            var dbLogConnectionString = settings.TradeDataAggregatorJob.Db.LogsConnString;
-
-            // Creating azure storage logger, which logs own messages to concole log
-            if (!string.IsNullOrEmpty(dbLogConnectionString) && !(dbLogConnectionString.StartsWith("${") && dbLogConnectionString.EndsWith("}")))
+            try
             {
-                logToAzureStorage = new LykkeLogToAzureStorage("Lykke.Job.TradeDataAggregator", new AzureTableStorage<LogEntity>(
-                    dbLogConnectionString, "TradeDataAggregatorLog", logToConsole));
+                // NOTE: Job not yet recieve and process IsAlive requests here
 
-                logAggregate.AddLogger(logToAzureStorage);
+                await ApplicationContainer.Resolve<IStartupManager>().StartAsync();
+                await Log.WriteMonitorAsync("", Program.EnvInfo, "Started");
             }
+            catch (Exception ex)
+            {
+                await Log.WriteFatalErrorAsync(nameof(Startup), nameof(StartApplication), "", ex);
+                throw;
+            }
+        }
 
-            // Creating aggregate log, which logs to console and to azure storage, if last one specified
-            var log = logAggregate.CreateLogger();
+        private async Task StopApplication()
+        {
+            try
+            {
+                // NOTE: Job still can recieve and process IsAlive requests here, so take care about it if you add logic here.
+
+                await ApplicationContainer.Resolve<IShutdownManager>().StopAsync();
+            }
+            catch (Exception ex)
+            {
+                if (Log != null)
+                {
+                    await Log.WriteFatalErrorAsync(nameof(Startup), nameof(StopApplication), "", ex);
+                }
+                throw;
+            }
+        }
+
+        private async Task CleanUp()
+        {
+            try
+            {
+                // NOTE: Job can't recieve and process IsAlive requests here, so you can destroy all resources
+
+                if (Log != null)
+                {
+                    await Log.WriteMonitorAsync("", Program.EnvInfo, "Terminating");
+                }
+
+                ApplicationContainer.Dispose();
+            }
+            catch (Exception ex)
+            {
+                if (Log != null)
+                {
+                    await Log.WriteFatalErrorAsync(nameof(Startup), nameof(CleanUp), "", ex);
+                    (Log as IDisposable)?.Dispose();
+                }
+                throw;
+            }
+        }
+
+        private static ILog CreateLogWithSlack(IServiceCollection services, IReloadingManager<AppSettings> settings)
+        {
+            var consoleLogger = new LogToConsole();
+            var aggregateLogger = new AggregateLogger();
+
+            aggregateLogger.AddLog(consoleLogger);
 
             // Creating slack notification service, which logs own azure queue processing messages to aggregate log
             var slackService = services.UseSlackNotificationsSenderViaAzureQueue(new AzureQueueIntegration.AzureQueueSettings
             {
-                ConnectionString = settings.SlackNotifications.AzureQueue.ConnectionString,
-                QueueName = settings.SlackNotifications.AzureQueue.QueueName,
+                ConnectionString = settings.CurrentValue.SlackNotifications.AzureQueue.ConnectionString,
+                QueueName = settings.CurrentValue.SlackNotifications.AzureQueue.QueueName
+            }, aggregateLogger);
 
-            }, log);
+            var dbLogConnectionStringManager = settings.Nested(x => x.TradeDataAggregatorJob.Db.LogsConnString);
+            var dbLogConnectionString = dbLogConnectionStringManager.CurrentValue;
 
-            // Finally, setting slack notification for azure storage log, which will forward necessary message to slack service
-            logToAzureStorage?.SetSlackNotification(slackService);
+            // Creating azure storage logger, which logs own messages to concole log
+            if (!string.IsNullOrEmpty(dbLogConnectionString) && !(dbLogConnectionString.StartsWith("${") && dbLogConnectionString.EndsWith("}")))
+            {
+                var persistenceManager = new LykkeLogToAzureStoragePersistenceManager(
+                    AzureTableStorage<LogEntity>.Create(dbLogConnectionStringManager, "TradeDataAggregatorLog", consoleLogger),
+                    consoleLogger);
 
-            return log;
+                var slackNotificationsManager = new LykkeLogToAzureSlackNotificationsManager(slackService, consoleLogger);
+
+                var azureStorageLogger = new LykkeLogToAzureStorage(
+                    persistenceManager,
+                    slackNotificationsManager,
+                    consoleLogger);
+
+                azureStorageLogger.Start();
+
+                aggregateLogger.AddLog(azureStorageLogger);
+            }
+
+            return aggregateLogger;
         }
     }
 }
