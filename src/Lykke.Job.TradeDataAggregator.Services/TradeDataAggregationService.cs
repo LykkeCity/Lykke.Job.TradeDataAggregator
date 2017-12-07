@@ -4,12 +4,14 @@ using System.Linq;
 using System.Threading.Tasks;
 using Common;
 using Common.Log;
-using Lykke.Job.TradeDataAggregator.Core.Domain.CacheOperations;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Feed;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Service.Assets.Client;
 using Lykke.Service.Assets.Client.Models;
+using Lykke.Service.OperationsHistory.Client;
+using Lykke.Service.OperationsHistory.Client.Models;
+using Newtonsoft.Json.Linq;
 
 namespace Lykke.Job.TradeDataAggregator.Services
 {
@@ -32,7 +34,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
             }
         }
 
-        private readonly IClientTradesRepository _clientTradesRepository;
+        private readonly IOperationsHistoryClient _operationsHistoryClient;
         private readonly IMarketDataRepository _marketDataRepository;
         private readonly IAssetsServiceWithCache _assetsService;
         private readonly ILog _log;
@@ -41,13 +43,13 @@ namespace Lykke.Job.TradeDataAggregator.Services
         private readonly Dictionary<string, TemporaryAggregatedData> _tempDataByLimitOrderAndDtId = new Dictionary<string, TemporaryAggregatedData>();
 
         public TradeDataAggregationService(
-            IClientTradesRepository clientTradesRepository,
+            IOperationsHistoryClient operationsHistoryClient,
             IMarketDataRepository marketDataRepository,
             IAssetsServiceWithCache assetsService,
             IAssetPairBestPriceRepository assetPairBestPriceRepository,
             ILog log)
         {
-            _clientTradesRepository = clientTradesRepository;
+            _operationsHistoryClient = operationsHistoryClient;
             _marketDataRepository = marketDataRepository;
             _assetsService = assetsService;
             _log = log;
@@ -56,7 +58,14 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
         public async Task ScanClientsAsync()
         {
-            await _clientTradesRepository.ScanByDtAsync(HandleTradeRecords, DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)), DateTime.UtcNow);
+            var historyResponse = await _operationsHistoryClient.GetByDateRange(DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)), DateTime.UtcNow, "ClientTrade");
+
+            if (historyResponse.Error != null)
+            {
+                throw new Exception(historyResponse.Error.Message);
+            }
+            
+            await HandleTradeRecords(historyResponse.Records);
 
             await FillMarketData();
         }
@@ -117,7 +126,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
             return assetPair.QuotingAssetId == targetAsset;
         }
 
-        private async Task HandleTradeRecords(IEnumerable<IClientTrade> trades)
+        private async Task HandleTradeRecords(IEnumerable<HistoryRecordModel> trades)
         {
             foreach (var item in trades)
             {
@@ -132,28 +141,37 @@ namespace Lykke.Job.TradeDataAggregator.Services
             }
         }
 
-        private void HandleTradeRecord(IClientTrade trade)
+        private void HandleTradeRecord(HistoryRecordModel trade)
         {
-            var key = TemporaryAggregatedData.CreateKey(trade.LimitOrderId, trade.DateTime);
-            if (!_tempDataByLimitOrderAndDtId.ContainsKey(key))
-            {
-                _tempDataByLimitOrderAndDtId.Add(key, new TemporaryAggregatedData
-                {
-                    Asset1 = trade.AssetId,
-                    ClientId = trade.ClientId,
-                    LimitOrderAndDateTimeKey = key,
-                    Volume1 = Math.Abs(trade.Amount),
-                    Price = trade.Price,
-                    Dt = trade.DateTime
-                });
-                return;
-            }
+            var tradeDetails = JObject.Parse(trade.CustomData);
 
-            var tempRecord = _tempDataByLimitOrderAndDtId[key];
-            if (tempRecord.ClientId == trade.ClientId)
+            var limitOrderId = (string) tradeDetails["LimitOrderId"];
+            var assetId = (string) tradeDetails["AssetId"];
+            var price = Convert.ToDouble(tradeDetails["Price"]);
+
+            if (!string.IsNullOrWhiteSpace(limitOrderId))
             {
-                tempRecord.Asset2 = trade.AssetId;
-                tempRecord.Volume2 = Math.Abs(trade.Amount);
+                var key = TemporaryAggregatedData.CreateKey(limitOrderId, trade.DateTime);
+                if (!_tempDataByLimitOrderAndDtId.ContainsKey(key))
+                {
+                    _tempDataByLimitOrderAndDtId.Add(key, new TemporaryAggregatedData
+                    {
+                        Asset1 = assetId,
+                        ClientId = trade.ClientId,
+                        LimitOrderAndDateTimeKey = key,
+                        Volume1 = Math.Abs(trade.Amount),
+                        Price = price,
+                        Dt = trade.DateTime
+                    });
+                    return;
+                }
+
+                var tempRecord = _tempDataByLimitOrderAndDtId[key];
+                if (tempRecord.ClientId == trade.ClientId)
+                {
+                    tempRecord.Asset2 = assetId;
+                    tempRecord.Volume2 = Math.Abs(trade.Amount);
+                }
             }
         }
     }

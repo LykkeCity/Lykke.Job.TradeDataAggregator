@@ -1,4 +1,5 @@
 ﻿using System;
+using Lykke.Service.OperationsHistory.Client;
 
 namespace Lykke.Job.TradeDataAggregator.Core
 {
@@ -8,6 +9,7 @@ namespace Lykke.Job.TradeDataAggregator.Core
         public SlackNotificationsSettings SlackNotifications { get; set; }
         public AssetsSettings Assets { get; set; }
         public RabbitMqSettings RabbitMq { get; set; }
+        public OperationsHistoryServiceClientSettings OperationsHistoryServiceClient { get; set; }
 
         public class TradeDataAggregatorSettings
         {

@@ -3,17 +3,16 @@ using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using AzureStorage.Tables;
 using Common.Log;
-using Lykke.Job.TradeDataAggregator.AzureRepositories.CacheOperations;
 using Lykke.Job.TradeDataAggregator.AzureRepositories.Exchange;
 using Lykke.Job.TradeDataAggregator.AzureRepositories.Feed;
 using Lykke.Job.TradeDataAggregator.Core;
-using Lykke.Job.TradeDataAggregator.Core.Domain.CacheOperations;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Feed;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Lykke.Job.TradeDataAggregator.Services;
 using Lykke.Service.Assets.Client;
+using Lykke.Service.OperationsHistory.Client;
 using Lykke.SettingsReader;
 
 namespace Lykke.Job.TradeDataAggregator.Modules
@@ -52,6 +51,8 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             builder.RegisterHandlers();
 
+            builder.RegisterServiceClients(_settings, _log);
+
             builder.Populate(_services);
         }
     }
@@ -68,10 +69,6 @@ namespace Lykke.Job.TradeDataAggregator.Modules
             container.RegisterInstance<ITradesCommonRepository>(new TradesCommonRepository(
                 AzureTableStorage<TradeCommonEntity>.Create(dbSettings.ConnectionString(x => x.HTradesConnString),
                     "TradesCommon", log)));
-
-            container.RegisterInstance<IClientTradesRepository>(new ClientTradesRepository(
-                AzureTableStorage<ClientTradeEntity>.Create(dbSettings.ConnectionString(x => x.HTradesConnString),
-                    "Trades", log)));
 
             container.RegisterInstance<IAssetPairBestPriceRepository>(new AssetPairBestPriceRepository(
                 AzureTableStorage<FeedDataEntity>.Create(dbSettings.ConnectionString(x => x.HLiquidityConnString),
@@ -111,6 +108,11 @@ namespace Lykke.Job.TradeDataAggregator.Modules
             container.RegisterType<ScanClientsHandler>()
                 .As<IScanClientsHandler>()
                 .SingleInstance();
+        }
+
+        public static void RegisterServiceClients(this ContainerBuilder container, AppSettings settings, ILog log)
+        {
+            container.RegisterOperationsHistoryClient(settings.OperationsHistoryServiceClient, log);
         }
     }
 }
