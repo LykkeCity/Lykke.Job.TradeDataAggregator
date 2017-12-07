@@ -85,6 +85,7 @@ namespace Lykke.Job.TradeDataAggregator
                 await _tradesCommonRepository.InsertCommonTrade(new TradeCommon
                 {
                     Amount = isLimitAssetBase ? trade.LimitVolume : trade.MarketVolume,
+                    AssetPair = message.Order.AssetPairId,
                     BaseAsset = isLimitAssetBase ? limitAsset.DisplayId : marketAsset.DisplayId,
                     BaseAssetId = isLimitAssetBase ? trade.LimitAsset : trade.MarketAsset,
                     QuotAssetId = isLimitAssetBase ? trade.MarketAsset : trade.LimitAsset,

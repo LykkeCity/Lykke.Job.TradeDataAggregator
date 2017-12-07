@@ -23,6 +23,7 @@ namespace Lykke.Job.TradeDataAggregator.AzureRepositories.Exchange
             return new TradeCommonEntity
             {
                 Amount = trade.Amount,
+                AssetPair = trade.AssetPair,
                 BaseAsset = trade.BaseAsset,
                 Dt = trade.Dt,
                 Id = trade.Id,
@@ -37,6 +38,7 @@ namespace Lykke.Job.TradeDataAggregator.AzureRepositories.Exchange
 
         public string Id { get; set; }
         public DateTime Dt { get; set; }
+        public string AssetPair { get; set; }
         public string BaseAsset { get; set; }
         public string QuotAsset { get; set; }
         public double Price { get; set; }

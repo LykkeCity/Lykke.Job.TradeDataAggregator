@@ -7,6 +7,7 @@ namespace Lykke.Job.TradeDataAggregator.Core.Domain.Exchange
     {
         string Id { get; set; }
         DateTime Dt { get; set; }
+        string AssetPair { get; set; }
         string BaseAsset { get; set; }
         string QuotAsset { get; set; }
         double Price { get; set; }
@@ -19,6 +20,7 @@ namespace Lykke.Job.TradeDataAggregator.Core.Domain.Exchange
     {
         public string Id { get; set; }
         public DateTime Dt { get; set; }
+        public string AssetPair { get; set; }
         public string BaseAsset { get; set; }
         public string QuotAsset { get; set; }
         public string BaseAssetId { get; set; }
