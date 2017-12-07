@@ -147,7 +147,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
             var limitOrderId = (string) tradeDetails["LimitOrderId"];
             var assetId = (string) tradeDetails["AssetId"];
-            var price = Convert.ToDouble(tradeDetails["Price"]);
+            var price = Convert.ToDouble((string) tradeDetails["Price"]);
 
             if (!string.IsNullOrWhiteSpace(limitOrderId))
             {
