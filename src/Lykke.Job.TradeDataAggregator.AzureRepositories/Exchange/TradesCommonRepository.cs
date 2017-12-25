@@ -8,9 +8,9 @@ namespace Lykke.Job.TradeDataAggregator.AzureRepositories.Exchange
 {
     public class TradeCommonEntity : TableEntity, ITradeCommon
     {
-        public static string GenerateParitionKey(DateTime dt)
+        public static string GenerateParitionKey(string assetPair)
         {
-            return $"{dt.Year}-{dt.Month}-{dt.Day}";
+            return assetPair.ToUpper();
         }
 
         public static string GenerateRowKey(DateTime dt, string id)
@@ -29,7 +29,7 @@ namespace Lykke.Job.TradeDataAggregator.AzureRepositories.Exchange
                 Id = trade.Id,
                 LimitOrderId = trade.LimitOrderId,
                 MarketOrderId = trade.MarketOrderId,
-                PartitionKey = GenerateParitionKey(trade.Dt),
+                PartitionKey = GenerateParitionKey(trade.AssetPair),
                 Price = trade.Price,
                 QuotAsset = trade.QuotAsset,
                 RowKey = GenerateRowKey(trade.Dt, trade.Id)
