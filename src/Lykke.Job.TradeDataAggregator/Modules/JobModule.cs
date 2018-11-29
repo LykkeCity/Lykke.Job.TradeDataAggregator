@@ -37,9 +37,6 @@ namespace Lykke.Job.TradeDataAggregator.Modules
                 .As<ILog>()
                 .SingleInstance();
 
-            // NOTE: You can implement your own poison queue notifier. See https://github.com/LykkeCity/JobTriggers/blob/master/readme.md
-            // builder.Register<PoisionQueueNotifierImplementation>().As<IPoisionQueueNotifier>();
-
             builder.RegisterType<HealthService>()
                 .As<IHealthService>()
                 .SingleInstance()
@@ -50,6 +47,13 @@ namespace Lykke.Job.TradeDataAggregator.Modules
             builder.RegisterAssetsClient(_settings.Assets.ServiceUrl);
 
             RegisterAzureRepositories(builder, _settingsManager.Nested(s => s.TradeDataAggregatorJob.Db), _log);
+
+            builder.RegisterInstance(_settings.RabbitMq).SingleInstance();
+
+            builder.RegisterType<RabbitMqHandler>()
+                .AsSelf()
+                .As<IStartable>()
+                .SingleInstance();
         }
 
         private static void RegisterAzureRepositories(ContainerBuilder container, IReloadingManager<AppSettings.DbSettings> dbSettings, ILog log)

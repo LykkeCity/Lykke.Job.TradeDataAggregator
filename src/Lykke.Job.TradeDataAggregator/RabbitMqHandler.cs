@@ -10,7 +10,6 @@ using Lykke.Job.TradeDataAggregator.Services.Models;
 using Lykke.RabbitMqBroker;
 using Lykke.RabbitMqBroker.Subscriber;
 using Lykke.Service.Assets.Client;
-using Lykke.Service.Assets.Client.Models;
 using Newtonsoft.Json;
 
 namespace Lykke.Job.TradeDataAggregator
@@ -36,7 +35,7 @@ namespace Lykke.Job.TradeDataAggregator
 
         public void Start()
         {
-            _log.WriteInfoAsync(nameof(RabbitMqHandler), nameof(Start), string.Empty, "Starting").Wait();
+            _log.WriteInfo(nameof(RabbitMqHandler), nameof(Start), "Starting");
 
             var rabbitSettings = new RabbitMqSubscriptionSettings
             {
@@ -58,17 +57,15 @@ namespace Lykke.Job.TradeDataAggregator
         public void Dispose()
         {
             _tradesSubscriber.Stop();
-            _log.WriteInfoAsync(nameof(RabbitMqHandler), nameof(Dispose), string.Empty, "Stopping").Wait();
+            _log.WriteInfo(nameof(RabbitMqHandler), nameof(Dispose), "Stopping");
         }
 
         private async Task ProcessTrade(TradeQueueItem message)
         {
             if (!message.Order.Status.Equals("matched", StringComparison.OrdinalIgnoreCase))
-            {
                 return;
-            }
 
-            var pair = await _assetsService.GetAssetPairAsync(message.Order.AssetPairId) as AssetPairResponseModel;
+            var pair = await _assetsService.AssetPairGetAsync(message.Order.AssetPairId);
 
             if (pair == null) throw new ArgumentNullException(nameof(pair));
 

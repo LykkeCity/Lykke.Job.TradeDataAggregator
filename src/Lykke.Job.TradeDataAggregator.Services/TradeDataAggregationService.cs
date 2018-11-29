@@ -58,10 +58,10 @@ namespace Lykke.Job.TradeDataAggregator.Services
         {
             await _clientTradesRepository.ScanByDtAsync(HandleTradeRecords, DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)), DateTime.UtcNow);
 
-            await FillMarketData();
+            await FillMarketDataAsync();
         }
 
-        private async Task FillMarketData()
+        private async Task FillMarketDataAsync()
         {
             var newMarketData = new Dictionary<string, IMarketData>();
             var assetPairs = await _assetsService.AssetPairGetAllAsync();
@@ -97,7 +97,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
                 }
                 catch (Exception ex)
                 {
-                    await _log.WriteErrorAsync("TradeDataAggregator", "FillMarketData", record.ToJson(), ex);
+                    _log.WriteError("FillMarketDataAsync", record.ToJson(), ex);
                 }
             }
 
@@ -127,7 +127,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
                 }
                 catch (Exception ex)
                 {
-                    await _log.WriteErrorAsync("TradeDataAggregator", "HandleTradeRecords", item.ToJson(), ex);
+                    _log.WriteError("HandleTradeRecords", item.ToJson(), ex);
                 }
             }
         }

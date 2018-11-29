@@ -16,6 +16,7 @@ using Lykke.SettingsReader;
 using Lykke.SlackNotification.AzureQueue;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.CodeAnalysis.Operations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -41,65 +42,73 @@ namespace Lykke.Job.TradeDataAggregator
 
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc()
-                .AddJsonOptions(options =>
+            try
+            {
+                services.AddMvc()
+                    .AddJsonOptions(options =>
+                    {
+                        options.SerializerSettings.ContractResolver =
+                            new Newtonsoft.Json.Serialization.DefaultContractResolver();
+                    });
+
+                services.AddSwaggerGen(options =>
                 {
-                    options.SerializerSettings.ContractResolver =
-                        new Newtonsoft.Json.Serialization.DefaultContractResolver();
+                    options.DefaultLykkeConfiguration("v1", "TradeDataAggregator API");
                 });
 
-            services.AddSwaggerGen(options =>
+                var builder = new ContainerBuilder();
+                var settingsManager = Configuration.LoadSettings<AppSettings>(o =>
+                {
+                    o.SetConnString(s => s.SlackNotifications.AzureQueue.ConnectionString);
+                    o.SetQueueName(s => s.SlackNotifications.AzureQueue.QueueName);
+                    o.SenderName = $"{AppEnvironment.Name} {AppEnvironment.Version}";
+                });
+
+                _log = CreateLogWithSlack(services, settingsManager);
+
+                builder.RegisterModule(new JobModule(settingsManager, _log));
+
+                builder.AddTriggers();
+
+                builder.Populate(services);
+
+                ApplicationContainer = builder.Build();
+
+                return new AutofacServiceProvider(ApplicationContainer);
+            }
+            catch (Exception e)
             {
-                options.DefaultLykkeConfiguration("v1", "TradeDataAggregator API");
-            });
-
-            var builder = new ContainerBuilder();
-            var settingsManager = Configuration.LoadSettings<AppSettings>(o =>
-            {
-                o.SetConnString(s => s.SlackNotifications.AzureQueue.ConnectionString);
-                o.SetQueueName(s => s.SlackNotifications.AzureQueue.QueueName);
-                o.SenderName = $"{AppEnvironment.Name} {AppEnvironment.Version}";
-            });
-
-            _log = CreateLogWithSlack(services, settingsManager);
-
-            builder.RegisterModule(new JobModule(settingsManager, _log));
-            builder.AddTriggers();
-
-            builder.RegisterInstance(settingsManager.CurrentValue.RabbitMq).SingleInstance();
-
-            builder.RegisterType<RabbitMqHandler>()
-                .AsSelf()
-                .As<IStartable>()
-                .SingleInstance();
-
-            builder.Populate(services);
-
-            ApplicationContainer = builder.Build();
-
-            return new AutofacServiceProvider(ApplicationContainer);
+                _log?.WriteFatalError(nameof(Startup), nameof(ConfigureServices), e);
+                throw;
+            }
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env, IApplicationLifetime appLifetime)
         {
-            if (env.IsDevelopment())
+            try
             {
-                app.UseDeveloperExceptionPage();
+                if (env.IsDevelopment())
+                    app.UseDeveloperExceptionPage();
+
+                app.UseLykkeMiddleware("TradeDataAggregator", ex => new ErrorResponse { ErrorMessage = "Technical problem" });
+
+                app.UseMvc();
+                app.UseSwagger();
+                app.UseSwaggerUI(x =>
+                {
+                    x.RoutePrefix = "swagger/ui";
+                    x.SwaggerEndpoint("/swagger/v1/swagger.json", "v1");
+                });
+
+                appLifetime.ApplicationStarted.Register(() => StartApplication().GetAwaiter().GetResult());
+                appLifetime.ApplicationStopping.Register(() => StopApplication().GetAwaiter().GetResult());
+                appLifetime.ApplicationStopped.Register(CleanUp);
             }
-
-            app.UseLykkeMiddleware("TradeDataAggregator", ex => new ErrorResponse { ErrorMessage = "Technical problem" });
-
-            app.UseMvc();
-            app.UseSwagger();
-            app.UseSwaggerUI(x =>
+            catch (Exception e)
             {
-                x.RoutePrefix = "swagger/ui";
-                x.SwaggerEndpoint("/swagger/v1/swagger.json", "v1");
-            });
-
-            appLifetime.ApplicationStarted.Register(() => StartApplication().GetAwaiter().GetResult());
-            appLifetime.ApplicationStopping.Register(() => StopApplication().GetAwaiter().GetResult());
-            appLifetime.ApplicationStopped.Register(() => CleanUp());
+                _log?.WriteFatalError(nameof(Startup), nameof(Configure), e);
+                throw;
+            }
         }
 
         private async Task StartApplication()
