@@ -17,9 +17,11 @@ namespace Lykke.Job.TradeDataAggregator.AzureRepositories.CacheOperations
         
         public Task ScanByDtAsync(Func<IEnumerable<IClientTrade>, Task> chunk, DateTime @from, DateTime to)
         {
-            var rangeQuery = AzureStorageUtils.QueryGenerator<ClientTradeEntity>
-                .RowKeyOnly.BetweenQuery(ClientTradeEntity.ByDt.GetRowKeyPart(from),
-                    ClientTradeEntity.ByDt.GetRowKeyPart(to), ToIntervalOption.IncludeTo);
+            var rangeQuery = AzureStorageUtils.QueryGenerator<ClientTradeEntity>.BetweenQuery(
+                "dt",
+                ClientTradeEntity.ByDt.GetRowKeyPart(from),
+                ClientTradeEntity.ByDt.GetRowKeyPart(to),
+                ToIntervalOption.IncludeTo);
             return _tableStorage.ScanDataAsync(rangeQuery, chunk);
         }
     }

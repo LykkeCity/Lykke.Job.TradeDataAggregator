@@ -1,23 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.Loader;
 using System.Threading.Tasks;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using AzureStorage.Tables;
-using Common;
 using Common.Log;
+using Lykke.Common;
 using Lykke.Common.ApiLibrary.Middleware;
 using Lykke.Common.ApiLibrary.Swagger;
 using Lykke.Job.TradeDataAggregator.Core;
 using Lykke.Job.TradeDataAggregator.Models;
 using Lykke.Job.TradeDataAggregator.Modules;
-using Lykke.Job.TradeDataAggregator.Services.Models;
 using Lykke.JobTriggers.Extenstions;
 using Lykke.Logs;
-using Lykke.RabbitMqBroker;
-using Lykke.RabbitMqBroker.Subscriber;
 using Lykke.SettingsReader;
 using Lykke.SlackNotification.AzureQueue;
 using Microsoft.AspNetCore.Builder;
@@ -29,6 +23,8 @@ namespace Lykke.Job.TradeDataAggregator
 {
     public class Startup
     {
+        private ILog _log;
+
         public IHostingEnvironment Environment { get; }
         public IContainer ApplicationContainer { get; set; }
         public IConfigurationRoot Configuration { get; }
@@ -37,8 +33,6 @@ namespace Lykke.Job.TradeDataAggregator
         {
             var builder = new ConfigurationBuilder()
                 .SetBasePath(env.ContentRootPath)
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
                 .AddEnvironmentVariables();
 
             Configuration = builder.Build();
@@ -60,15 +54,19 @@ namespace Lykke.Job.TradeDataAggregator
             });
 
             var builder = new ContainerBuilder();
-            var appSettings = Environment.IsDevelopment()
-                ? Configuration.Get<AppSettings>()
-                : HttpSettingsLoader.Load<AppSettings>(Configuration.GetValue<string>("SettingsUrl"));
-            var log = CreateLogWithSlack(services, appSettings);
+            var settingsManager = Configuration.LoadSettings<AppSettings>(o =>
+            {
+                o.SetConnString(s => s.SlackNotifications.AzureQueue.ConnectionString);
+                o.SetQueueName(s => s.SlackNotifications.AzureQueue.QueueName);
+                o.SenderName = $"{AppEnvironment.Name} {AppEnvironment.Version}";
+            });
 
-            builder.RegisterModule(new JobModule(appSettings, log));
+            _log = CreateLogWithSlack(services, settingsManager);
+
+            builder.RegisterModule(new JobModule(settingsManager, _log));
             builder.AddTriggers();
 
-            builder.RegisterInstance(appSettings.RabbitMq).SingleInstance();
+            builder.RegisterInstance(settingsManager.CurrentValue.RabbitMq).SingleInstance();
 
             builder.RegisterType<RabbitMqHandler>()
                 .AsSelf()
@@ -93,49 +91,92 @@ namespace Lykke.Job.TradeDataAggregator
 
             app.UseMvc();
             app.UseSwagger();
-            app.UseSwaggerUi();
-
-            appLifetime.ApplicationStopped.Register(() =>
+            app.UseSwaggerUI(x =>
             {
-                ApplicationContainer.Dispose();
+                x.RoutePrefix = "swagger/ui";
+                x.SwaggerEndpoint("/swagger/v1/swagger.json", "v1");
             });
+
+            appLifetime.ApplicationStarted.Register(() => StartApplication().GetAwaiter().GetResult());
+            appLifetime.ApplicationStopping.Register(() => StopApplication().GetAwaiter().GetResult());
+            appLifetime.ApplicationStopped.Register(() => CleanUp());
         }
 
-        private static ILog CreateLogWithSlack(IServiceCollection services, AppSettings settings)
+        private async Task StartApplication()
         {
-            LykkeLogToAzureStorage logToAzureStorage = null;
-
-            var logToConsole = new LogToConsole();
-            var logAggregate = new LogAggregate();
-
-            logAggregate.AddLogger(logToConsole);
-
-            var dbLogConnectionString = settings.TradeDataAggregatorJob.Db.LogsConnString;
-
-            // Creating azure storage logger, which logs own messages to concole log
-            if (!string.IsNullOrEmpty(dbLogConnectionString) && !(dbLogConnectionString.StartsWith("${") && dbLogConnectionString.EndsWith("}")))
+            try
             {
-                logToAzureStorage = new LykkeLogToAzureStorage("Lykke.Job.TradeDataAggregator", new AzureTableStorage<LogEntity>(
-                    dbLogConnectionString, "TradeDataAggregatorLog", logToConsole));
+                _log.WriteMonitor("", "", "Started");
+            }
+            catch (Exception ex)
+            {
+                _log.WriteFatalError(nameof(Startup), nameof(StartApplication), ex);
+                throw;
+            }
+        }
 
-                logAggregate.AddLogger(logToAzureStorage);
+        private async Task StopApplication()
+        {
+        }
+
+        private void CleanUp()
+        {
+            try
+            {
+                _log?.WriteMonitor("", "", "Terminating");
+                ApplicationContainer.Dispose();
+            }
+            catch (Exception ex)
+            {
+                if (_log != null)
+                {
+                    _log.WriteFatalError(nameof(Startup), nameof(CleanUp), ex);
+                    (_log as IDisposable)?.Dispose();
+                }
+                throw;
+            }
+        }
+
+        private static ILog CreateLogWithSlack(IServiceCollection services, IReloadingManager<AppSettings> settingsManager)
+        {
+            var consoleLogger = new LogToConsole();
+            var aggregateLogger = new AggregateLogger();
+
+            aggregateLogger.AddLog(consoleLogger);
+
+            var dbLogConnectionStringManager = settingsManager.Nested(x => x.TradeDataAggregatorJob.Db.LogsConnString);
+            var dbLogConnectionString = dbLogConnectionStringManager.CurrentValue;
+
+            if (string.IsNullOrEmpty(dbLogConnectionString))
+            {
+                consoleLogger.WriteWarning(nameof(Startup), nameof(CreateLogWithSlack), "Table loggger is not inited");
+                return aggregateLogger;
             }
 
-            // Creating aggregate log, which logs to console and to azure storage, if last one specified
-            var log = logAggregate.CreateLogger();
+            if (dbLogConnectionString.StartsWith("${") && dbLogConnectionString.EndsWith("}"))
+                throw new InvalidOperationException($"LogsConnString {dbLogConnectionString} is not filled in settings");
+
+            var persistenceManager = new LykkeLogToAzureStoragePersistenceManager(
+                AzureTableStorage<LogEntity>.Create(dbLogConnectionStringManager, "TradeDataAggregatorLog", consoleLogger),
+                consoleLogger);
 
             // Creating slack notification service, which logs own azure queue processing messages to aggregate log
             var slackService = services.UseSlackNotificationsSenderViaAzureQueue(new AzureQueueIntegration.AzureQueueSettings
             {
-                ConnectionString = settings.SlackNotifications.AzureQueue.ConnectionString,
-                QueueName = settings.SlackNotifications.AzureQueue.QueueName,
+                ConnectionString = settingsManager.CurrentValue.SlackNotifications.AzureQueue.ConnectionString,
+                QueueName = settingsManager.CurrentValue.SlackNotifications.AzureQueue.QueueName
+            }, aggregateLogger);
 
-            }, log);
+            var slackNotificationsManager = new LykkeLogToAzureSlackNotificationsManager(slackService, consoleLogger);
 
-            // Finally, setting slack notification for azure storage log, which will forward necessary message to slack service
-            logToAzureStorage?.SetSlackNotification(slackService);
+            var azureStorageLogger = new LykkeLogToAzureStorage(
+                persistenceManager,
+                slackNotificationsManager,
+                consoleLogger);
+            azureStorageLogger.Start();
+            aggregateLogger.AddLog(azureStorageLogger);
 
-            return log;
+            return aggregateLogger;
         }
     }
 }

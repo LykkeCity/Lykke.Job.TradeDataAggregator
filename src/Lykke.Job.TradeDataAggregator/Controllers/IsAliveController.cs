@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Net;
+using Lykke.Common;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Job.TradeDataAggregator.Models;
 using Microsoft.AspNetCore.Mvc;
-using Swashbuckle.SwaggerGen.Annotations;
+using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace Lykke.Job.TradeDataAggregator.Controllers
 {
@@ -20,7 +21,6 @@ namespace Lykke.Job.TradeDataAggregator.Controllers
         /// <summary>
         /// Checks service is alive
         /// </summary>
-        /// <returns></returns>
         [HttpGet]
         [SwaggerOperation("IsAlive")]
         [ProducesResponseType(typeof(IsAliveResponse), (int)HttpStatusCode.OK)]
@@ -38,7 +38,8 @@ namespace Lykke.Job.TradeDataAggregator.Controllers
 
             return Ok(new IsAliveResponse
             {
-                Version = Microsoft.Extensions.PlatformAbstractions.PlatformServices.Default.Application.ApplicationVersion,
+                Name = AppEnvironment.Name,
+                Version = AppEnvironment.Version,
                 Env = Environment.GetEnvironmentVariable("ENV_INFO"),
                 LastClientsScanningStartedMoment = _healthService.LastClientsScanningStartedMoment,
                 LastClientsScanningDuration = _healthService.LastClientsScanningDuration,

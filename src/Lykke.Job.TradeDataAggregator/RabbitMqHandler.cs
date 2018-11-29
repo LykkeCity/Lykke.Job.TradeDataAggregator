@@ -19,13 +19,13 @@ namespace Lykke.Job.TradeDataAggregator
     {
         private readonly AppSettings.RabbitMqSettings _rabbitMqSettings;
         private readonly ITradesCommonRepository _tradesCommonRepository;
-        private readonly IAssetsservice _assetsService;
+        private readonly IAssetsService _assetsService;
         private readonly ILog _log;
         private RabbitMqSubscriber<TradeQueueItem> _tradesSubscriber;
 
         public RabbitMqHandler(AppSettings.RabbitMqSettings rabbitMqSettings,
             ITradesCommonRepository tradesCommonRepository,
-            IAssetsservice assetsService,
+            IAssetsService assetsService,
             ILog log)
         {
             _rabbitMqSettings = rabbitMqSettings;
@@ -74,10 +74,10 @@ namespace Lykke.Job.TradeDataAggregator
 
             bool isLimitAssetBase = message.Trades.First().LimitAsset == pair.BaseAssetId;
 
-            var limitAsset = await _assetsService.GetAssetAsync(message.Trades.First().LimitAsset) as AssetResponseModel;
+            var limitAsset = await _assetsService.AssetGetAsync(message.Trades.First().LimitAsset);
             if (limitAsset == null) throw new ArgumentNullException(nameof(limitAsset));
 
-            var marketAsset = await _assetsService.GetAssetAsync(message.Trades.First().MarketAsset) as AssetResponseModel;
+            var marketAsset = await _assetsService.AssetGetAsync(message.Trades.First().MarketAsset);
             if (marketAsset == null) throw new ArgumentNullException(nameof(marketAsset));
 
             foreach (var trade in message.Trades)
