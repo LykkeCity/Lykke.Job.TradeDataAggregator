@@ -9,9 +9,11 @@ using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Job.TradeDataAggregator.Services;
 using Lykke.Sdk;
+using Lykke.Sdk.Health;
 using Lykke.Service.Assets.Client;
 using Lykke.Service.MarketProfile.Client;
 using Lykke.SettingsReader;
+using HealthService = Lykke.Job.TradeDataAggregator.Services.HealthService;
 
 namespace Lykke.Job.TradeDataAggregator.Modules
 {
@@ -39,6 +41,7 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             builder.RegisterType<HealthService>()
                 .As<IHealthService>()
+                .As<IHealthServiceExt>()
                 .SingleInstance()
                 .WithParameter(TypedParameter.From(_settings.TradeDataAggregatorJob.MaxHealthyClientScanningDuration));
 
