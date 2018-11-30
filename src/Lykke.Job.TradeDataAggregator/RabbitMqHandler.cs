@@ -2,10 +2,9 @@
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Autofac;
 using Common.Log;
-using Lykke.Job.TradeDataAggregator.Core;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
+using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Job.TradeDataAggregator.Services.Models;
 using Lykke.RabbitMqBroker;
 using Lykke.RabbitMqBroker.Subscriber;
@@ -14,15 +13,16 @@ using Newtonsoft.Json;
 
 namespace Lykke.Job.TradeDataAggregator
 {
-    public class RabbitMqHandler : IStartable, IDisposable
+    public class RabbitMqHandler : IStartStop
     {
-        private readonly AppSettings.RabbitMqSettings _rabbitMqSettings;
+        private readonly RabbitMqSettings _rabbitMqSettings;
         private readonly ITradesCommonRepository _tradesCommonRepository;
         private readonly IAssetsService _assetsService;
         private readonly ILog _log;
         private RabbitMqSubscriber<TradeQueueItem> _tradesSubscriber;
 
-        public RabbitMqHandler(AppSettings.RabbitMqSettings rabbitMqSettings,
+        public RabbitMqHandler(
+            RabbitMqSettings rabbitMqSettings,
             ITradesCommonRepository tradesCommonRepository,
             IAssetsService assetsService,
             ILog log)
@@ -35,8 +35,6 @@ namespace Lykke.Job.TradeDataAggregator
 
         public void Start()
         {
-            _log.WriteInfo(nameof(RabbitMqHandler), nameof(Start), "Starting");
-
             var rabbitSettings = new RabbitMqSubscriptionSettings
             {
                 ConnectionString =
@@ -54,10 +52,14 @@ namespace Lykke.Job.TradeDataAggregator
                 .Start();
         }
 
-        public void Dispose()
+        public void Stop()
         {
             _tradesSubscriber.Stop();
-            _log.WriteInfo(nameof(RabbitMqHandler), nameof(Dispose), "Stopping");
+        }
+
+        public void Dispose()
+        {
+            Stop();
         }
 
         private async Task ProcessTrade(TradeQueueItem message)

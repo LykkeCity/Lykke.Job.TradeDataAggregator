@@ -7,16 +7,15 @@ using Common.Log;
 using Lykke.Common;
 using Lykke.Common.ApiLibrary.Middleware;
 using Lykke.Common.ApiLibrary.Swagger;
-using Lykke.Job.TradeDataAggregator.Core;
 using Lykke.Job.TradeDataAggregator.Models;
 using Lykke.Job.TradeDataAggregator.Modules;
 using Lykke.JobTriggers.Extenstions;
 using Lykke.Logs;
+using Lykke.Sdk;
 using Lykke.SettingsReader;
 using Lykke.SlackNotification.AzureQueue;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.CodeAnalysis.Operations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -115,6 +114,7 @@ namespace Lykke.Job.TradeDataAggregator
         {
             try
             {
+                await ApplicationContainer.Resolve<IStartupManager>().StartAsync();
                 _log.WriteMonitor("", "", "Started");
             }
             catch (Exception ex)
@@ -126,6 +126,15 @@ namespace Lykke.Job.TradeDataAggregator
 
         private async Task StopApplication()
         {
+            try
+            {
+                await ApplicationContainer.Resolve<IShutdownManager>().StopAsync();
+            }
+            catch (Exception ex)
+            {
+                _log?.WriteFatalError(nameof(Startup), nameof(StopApplication), ex);
+                throw;
+            }
         }
 
         private void CleanUp()

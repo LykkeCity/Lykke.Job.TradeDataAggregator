@@ -1,16 +1,16 @@
-﻿using Autofac;
+﻿using System;
+using Autofac;
 using AzureStorage.Tables;
 using Common.Log;
 using Lykke.Job.TradeDataAggregator.AzureRepositories.CacheOperations;
 using Lykke.Job.TradeDataAggregator.AzureRepositories.Exchange;
-using Lykke.Job.TradeDataAggregator.AzureRepositories.Feed;
-using Lykke.Job.TradeDataAggregator.Core;
 using Lykke.Job.TradeDataAggregator.Core.Domain.CacheOperations;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
-using Lykke.Job.TradeDataAggregator.Core.Domain.Feed;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Job.TradeDataAggregator.Services;
+using Lykke.Sdk;
 using Lykke.Service.Assets.Client;
+using Lykke.Service.MarketProfile.Client;
 using Lykke.SettingsReader;
 
 namespace Lykke.Job.TradeDataAggregator.Modules
@@ -42,9 +42,22 @@ namespace Lykke.Job.TradeDataAggregator.Modules
                 .SingleInstance()
                 .WithParameter(TypedParameter.From(_settings.TradeDataAggregatorJob.MaxHealthyClientScanningDuration));
 
+            builder.RegisterType<StartupManager>()
+                .As<IStartupManager>()
+                .SingleInstance();
+
+            builder.RegisterType<ShutdownManager>()
+                .As<IShutdownManager>()
+                .AutoActivate()
+                .SingleInstance();
+
             builder.RegisterType<TradeDataAggregationService>().As<ITradeDataAggregationService>();
 
             builder.RegisterAssetsClient(_settings.Assets.ServiceUrl);
+
+            builder.RegisterType<LykkeMarketProfile>()
+                .As<ILykkeMarketProfile>()
+                .WithParameter("baseUri", new Uri(_settings.MarketProfileServiceClient.ServiceUrl));
 
             RegisterAzureRepositories(builder, _settingsManager.Nested(s => s.TradeDataAggregatorJob.Db), _log);
 
@@ -52,11 +65,11 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             builder.RegisterType<RabbitMqHandler>()
                 .AsSelf()
-                .As<IStartable>()
+                .As<IStartStop>()
                 .SingleInstance();
         }
 
-        private static void RegisterAzureRepositories(ContainerBuilder container, IReloadingManager<AppSettings.DbSettings> dbSettings, ILog log)
+        private static void RegisterAzureRepositories(ContainerBuilder container, IReloadingManager<DbSettings> dbSettings, ILog log)
         {
             container.RegisterInstance<IMarketDataRepository>(
                 new MarketDataRepository(
@@ -69,10 +82,6 @@ namespace Lykke.Job.TradeDataAggregator.Modules
             container.RegisterInstance<IClientTradesRepository>(
                 new ClientTradesRepository(
                     AzureTableStorage<ClientTradeEntity>.Create(dbSettings.ConnectionString(s =>s.HTradesConnString), "Trades", log)));
-
-            container.RegisterInstance<IAssetPairBestPriceRepository>(
-                new AssetPairBestPriceRepository(
-                    AzureTableStorage<FeedDataEntity>.Create(dbSettings.ConnectionString(s => s.HLiquidityConnString), "MarketProfile", log)));
         }
     }
 }
