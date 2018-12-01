@@ -1,33 +1,33 @@
 ﻿using System;
 using Autofac;
-using Autofac.Extensions.DependencyInjection;
 using AzureStorage.Tables;
 using Common.Log;
 using Lykke.Job.TradeDataAggregator.AzureRepositories.CacheOperations;
 using Lykke.Job.TradeDataAggregator.AzureRepositories.Exchange;
-using Lykke.Job.TradeDataAggregator.AzureRepositories.Feed;
-using Lykke.Job.TradeDataAggregator.Core;
 using Lykke.Job.TradeDataAggregator.Core.Domain.CacheOperations;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
-using Lykke.Job.TradeDataAggregator.Core.Domain.Feed;
 using Lykke.Job.TradeDataAggregator.Core.Services;
-using Lykke.Service.Assets.Client.Custom;
-using Microsoft.Extensions.DependencyInjection;
 using Lykke.Job.TradeDataAggregator.Services;
+using Lykke.Sdk;
+using Lykke.Sdk.Health;
+using Lykke.Service.Assets.Client;
+using Lykke.Service.MarketProfile.Client;
+using Lykke.SettingsReader;
+using HealthService = Lykke.Job.TradeDataAggregator.Services.HealthService;
 
 namespace Lykke.Job.TradeDataAggregator.Modules
 {
     public class JobModule : Module
     {
         private readonly AppSettings _settings;
+        private readonly IReloadingManager<AppSettings> _settingsManager;
         private readonly ILog _log;
-        private readonly ServiceCollection _services;
 
-        public JobModule(AppSettings settings, ILog log)
+        public JobModule(IReloadingManager<AppSettings> settingsManager, ILog log)
         {
-            _settings = settings;
+            _settingsManager = settingsManager;
+            _settings = settingsManager.CurrentValue;
             _log = log;
-            _services = new ServiceCollection();
         }
 
         protected override void Load(ContainerBuilder builder)
@@ -39,43 +39,52 @@ namespace Lykke.Job.TradeDataAggregator.Modules
                 .As<ILog>()
                 .SingleInstance();
 
-            // NOTE: You can implement your own poison queue notifier. See https://github.com/LykkeCity/JobTriggers/blob/master/readme.md
-            // builder.Register<PoisionQueueNotifierImplementation>().As<IPoisionQueueNotifier>();
-
             builder.RegisterType<HealthService>()
                 .As<IHealthService>()
+                .As<IHealthServiceExt>()
                 .SingleInstance()
                 .WithParameter(TypedParameter.From(_settings.TradeDataAggregatorJob.MaxHealthyClientScanningDuration));
 
+            builder.RegisterType<StartupManager>()
+                .As<IStartupManager>()
+                .SingleInstance();
+
+            builder.RegisterType<ShutdownManager>()
+                .As<IShutdownManager>()
+                .AutoActivate()
+                .SingleInstance();
+
             builder.RegisterType<TradeDataAggregationService>().As<ITradeDataAggregationService>();
 
-            _services.UseAssetsClient(new AssetServiceSettings
-            {
-                BaseUri = new Uri(_settings.Assets.ServiceUrl)
-            });
+            builder.RegisterAssetsClient(_settings.Assets.ServiceUrl);
 
-            RegisterAzureRepositories(builder, _settings.TradeDataAggregatorJob.Db, _log);
+            builder.RegisterType<LykkeMarketProfile>()
+                .As<ILykkeMarketProfile>()
+                .WithParameter("baseUri", new Uri(_settings.MarketProfileServiceClient.ServiceUrl));
 
-            builder.Populate(_services);
+            RegisterAzureRepositories(builder, _settingsManager.Nested(s => s.TradeDataAggregatorJob.Db), _log);
+
+            builder.RegisterInstance(_settings.RabbitMq).SingleInstance();
+
+            builder.RegisterType<RabbitMqHandler>()
+                .AsSelf()
+                .As<IStartStop>()
+                .SingleInstance();
         }
 
-        private static void RegisterAzureRepositories(ContainerBuilder container, AppSettings.DbSettings dbSettings, ILog log)
+        private static void RegisterAzureRepositories(ContainerBuilder container, IReloadingManager<DbSettings> dbSettings, ILog log)
         {
             container.RegisterInstance<IMarketDataRepository>(
                 new MarketDataRepository(
-                    new AzureTableStorage<MarketDataEntity>(dbSettings.HTradesConnString, "MarketsData", log)));
+                    AzureTableStorage<MarketDataEntity>.Create(dbSettings.ConnectionString(s => s.HTradesConnString), "MarketsData", log)));
 
             container.RegisterInstance<ITradesCommonRepository>(
                 new TradesCommonRepository(
-                    new AzureTableStorage<TradeCommonEntity>(dbSettings.HTradesConnString, "TradesCommon", log)));
+                    AzureTableStorage<TradeCommonEntity>.Create(dbSettings.ConnectionString(s => s.HTradesConnString), "TradesCommon", log)));
 
             container.RegisterInstance<IClientTradesRepository>(
                 new ClientTradesRepository(
-                    new AzureTableStorage<ClientTradeEntity>(dbSettings.HTradesConnString, "Trades", log)));
-
-            container.RegisterInstance<IAssetPairBestPriceRepository>(
-                new AssetPairBestPriceRepository(
-                    new AzureTableStorage<FeedDataEntity>(dbSettings.HLiquidityConnString, "MarketProfile", log)));
+                    AzureTableStorage<ClientTradeEntity>.Create(dbSettings.ConnectionString(s =>s.HTradesConnString), "Trades", log)));
         }
     }
 }

@@ -2,30 +2,29 @@
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Autofac;
 using Common.Log;
-using Lykke.Job.TradeDataAggregator.Core;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
+using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Job.TradeDataAggregator.Services.Models;
 using Lykke.RabbitMqBroker;
 using Lykke.RabbitMqBroker.Subscriber;
 using Lykke.Service.Assets.Client;
-using Lykke.Service.Assets.Client.Models;
 using Newtonsoft.Json;
 
 namespace Lykke.Job.TradeDataAggregator
 {
-    public class RabbitMqHandler : IStartable, IDisposable
+    public class RabbitMqHandler : IStartStop
     {
-        private readonly AppSettings.RabbitMqSettings _rabbitMqSettings;
+        private readonly RabbitMqSettings _rabbitMqSettings;
         private readonly ITradesCommonRepository _tradesCommonRepository;
-        private readonly IAssetsservice _assetsService;
+        private readonly IAssetsService _assetsService;
         private readonly ILog _log;
         private RabbitMqSubscriber<TradeQueueItem> _tradesSubscriber;
 
-        public RabbitMqHandler(AppSettings.RabbitMqSettings rabbitMqSettings,
+        public RabbitMqHandler(
+            RabbitMqSettings rabbitMqSettings,
             ITradesCommonRepository tradesCommonRepository,
-            IAssetsservice assetsService,
+            IAssetsService assetsService,
             ILog log)
         {
             _rabbitMqSettings = rabbitMqSettings;
@@ -36,8 +35,6 @@ namespace Lykke.Job.TradeDataAggregator
 
         public void Start()
         {
-            _log.WriteInfoAsync(nameof(RabbitMqHandler), nameof(Start), string.Empty, "Starting").Wait();
-
             var rabbitSettings = new RabbitMqSubscriptionSettings
             {
                 ConnectionString =
@@ -55,29 +52,31 @@ namespace Lykke.Job.TradeDataAggregator
                 .Start();
         }
 
-        public void Dispose()
+        public void Stop()
         {
             _tradesSubscriber.Stop();
-            _log.WriteInfoAsync(nameof(RabbitMqHandler), nameof(Dispose), string.Empty, "Stopping").Wait();
+        }
+
+        public void Dispose()
+        {
+            Stop();
         }
 
         private async Task ProcessTrade(TradeQueueItem message)
         {
             if (!message.Order.Status.Equals("matched", StringComparison.OrdinalIgnoreCase))
-            {
                 return;
-            }
 
-            var pair = await _assetsService.GetAssetPairAsync(message.Order.AssetPairId) as AssetPairResponseModel;
+            var pair = await _assetsService.AssetPairGetAsync(message.Order.AssetPairId);
 
             if (pair == null) throw new ArgumentNullException(nameof(pair));
 
             bool isLimitAssetBase = message.Trades.First().LimitAsset == pair.BaseAssetId;
 
-            var limitAsset = await _assetsService.GetAssetAsync(message.Trades.First().LimitAsset) as AssetResponseModel;
+            var limitAsset = await _assetsService.AssetGetAsync(message.Trades.First().LimitAsset);
             if (limitAsset == null) throw new ArgumentNullException(nameof(limitAsset));
 
-            var marketAsset = await _assetsService.GetAssetAsync(message.Trades.First().MarketAsset) as AssetResponseModel;
+            var marketAsset = await _assetsService.AssetGetAsync(message.Trades.First().MarketAsset);
             if (marketAsset == null) throw new ArgumentNullException(nameof(marketAsset));
 
             foreach (var trade in message.Trades)

@@ -6,10 +6,10 @@ using Common;
 using Common.Log;
 using Lykke.Job.TradeDataAggregator.Core.Domain.CacheOperations;
 using Lykke.Job.TradeDataAggregator.Core.Domain.Exchange;
-using Lykke.Job.TradeDataAggregator.Core.Domain.Feed;
 using Lykke.Job.TradeDataAggregator.Core.Services;
 using Lykke.Service.Assets.Client;
-using Lykke.Service.Assets.Client.Custom;
+using Lykke.Service.Assets.Client.Models;
+using Lykke.Service.MarketProfile.Client;
 
 namespace Lykke.Job.TradeDataAggregator.Services
 {
@@ -34,77 +34,79 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
         private readonly IClientTradesRepository _clientTradesRepository;
         private readonly IMarketDataRepository _marketDataRepository;
-        private readonly IAssetsservice _assetsService;
+        private readonly IAssetsService _assetsService;
+        private readonly ILykkeMarketProfile _marketProfileService;
         private readonly ILog _log;
-        private readonly MarketProfile _marketProfile;
 
         private readonly Dictionary<string, TemporaryAggregatedData> _tempDataByLimitOrderAndDtId = new Dictionary<string, TemporaryAggregatedData>();
 
         public TradeDataAggregationService(
             IClientTradesRepository clientTradesRepository,
             IMarketDataRepository marketDataRepository,
-            IAssetsservice assetsService,
-            IAssetPairBestPriceRepository assetPairBestPriceRepository,
+            IAssetsService assetsService,
+            ILykkeMarketProfile marketProfileService,
             ILog log)
         {
             _clientTradesRepository = clientTradesRepository;
             _marketDataRepository = marketDataRepository;
             _assetsService = assetsService;
+            _marketProfileService = marketProfileService;
             _log = log;
-            _marketProfile = assetPairBestPriceRepository.GetAsync().Result;
         }
 
         public async Task ScanClientsAsync()
         {
             await _clientTradesRepository.ScanByDtAsync(HandleTradeRecords, DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)), DateTime.UtcNow);
 
-            await FillMarketData();
+            await FillMarketDataAsync();
         }
 
-        private async Task FillMarketData()
+        private async Task FillMarketDataAsync()
         {
             var newMarketData = new Dictionary<string, IMarketData>();
-            var assetPairs = await _assetsService.GetAssetPairsAsync();
+            var assetPairs = await _assetsService.AssetPairGetAllAsync();
             var tempDataValues = _tempDataByLimitOrderAndDtId.Values.OrderBy(x => x.Dt);
+
+            var marketProfile = await _marketProfileService.ApiMarketProfileGetAsync();
+            var assetPairsHash = marketProfile.Select(i => i.AssetPair).ToHashSet();
 
             foreach (var record in tempDataValues)
             {
                 try
                 {
                     var assetPair = FindPairWithAssets(assetPairs, record.Asset1, record.Asset2);
-                    if (assetPair != null && record.Volume1 > 0 &&
-                        _marketProfile.Profile.Any(x => x.Asset == assetPair.Id))
-                    {
-                        var isInverted = IsInvertedTarget(assetPair, record.Asset1);
-                        var volume = isInverted ? record.Volume1 : record.Volume2;
+                    if (assetPair == null || record.Volume1 <= 0 || !assetPairsHash.Contains(assetPair.Id))
+                        continue;
 
-                        if (newMarketData.ContainsKey(assetPair.Id))
+                    var isInverted = IsInvertedTarget(assetPair, record.Asset1);
+                    var volume = isInverted ? record.Volume1 : record.Volume2;
+
+                    if (newMarketData.ContainsKey(assetPair.Id))
+                    {
+                        newMarketData[assetPair.Id].LastPrice = record.Price;
+                        newMarketData[assetPair.Id].Volume += volume;
+                    }
+                    else
+                    {
+                        newMarketData.Add(assetPair.Id, new MarketData
                         {
-                            newMarketData[assetPair.Id].LastPrice = record.Price;
-                            newMarketData[assetPair.Id].Volume += volume;
-                        }
-                        else
-                        {
-                            newMarketData.Add(assetPair.Id, new MarketData
-                            {
-                                AssetPairId = assetPair.Id,
-                                LastPrice = record.Price,
-                                Volume = volume,
-                                Dt = DateTime.UtcNow
-                            });
-                        }
+                            AssetPairId = assetPair.Id,
+                            LastPrice = record.Price,
+                            Volume = volume,
+                            Dt = DateTime.UtcNow
+                        });
                     }
                 }
                 catch (Exception ex)
                 {
-                    await _log.WriteErrorAsync("TradeDataAggregator", "FillMarketData", record.ToJson(), ex);
+                    _log.WriteError("FillMarketDataAsync", record.ToJson(), ex);
                 }
             }
 
             await _marketDataRepository.AddOrMergeMarketData(newMarketData.Values);
         }
 
-        private static IAssetPair FindPairWithAssets(IEnumerable<IAssetPair> src, string assetId1, string assetId2)
+        private static AssetPair FindPairWithAssets(IEnumerable<AssetPair> src, string assetId1, string assetId2)
         {
             return src.FirstOrDefault(assetPair =>
                 assetPair.BaseAssetId == assetId1 && assetPair.QuotingAssetId == assetId2 ||
@@ -112,12 +114,12 @@ namespace Lykke.Job.TradeDataAggregator.Services
             );
         }
 
-        private static bool IsInvertedTarget(IAssetPair assetPair, string targetAsset)
+        private static bool IsInvertedTarget(AssetPair assetPair, string targetAsset)
         {
             return assetPair.QuotingAssetId == targetAsset;
         }
 
-        private async Task HandleTradeRecords(IEnumerable<IClientTrade> trades)
+        private Task HandleTradeRecords(IEnumerable<IClientTrade> trades)
         {
             foreach (var item in trades)
             {
@@ -127,9 +129,11 @@ namespace Lykke.Job.TradeDataAggregator.Services
                 }
                 catch (Exception ex)
                 {
-                    await _log.WriteErrorAsync("TradeDataAggregator", "HandleTradeRecords", item.ToJson(), ex);
+                    _log.WriteError("HandleTradeRecords", item.ToJson(), ex);
                 }
             }
+
+            return Task.CompletedTask;
         }
 
         private void HandleTradeRecord(IClientTrade trade)

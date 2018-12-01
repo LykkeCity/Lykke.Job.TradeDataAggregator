@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.Loader;
 using System.Threading;
 using System.Threading.Tasks;
+using Lykke.Common;
 using Lykke.JobTriggers.Triggers;
 using Microsoft.AspNetCore.Hosting;
 
@@ -10,10 +11,11 @@ namespace Lykke.Job.TradeDataAggregator
 {
     class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
+            Console.WriteLine($"{AppEnvironment.Name} {AppEnvironment.Version}");
+
             var webHostCancellationTokenSource = new CancellationTokenSource();
-            IWebHost webHost = null;
             TriggerHost triggerHost = null;
             Task webHostTask = null;
             Task triggerHostTask = null;
@@ -30,13 +32,15 @@ namespace Lykke.Job.TradeDataAggregator
                     end.WaitOne();
                 };
 
-                webHost = new WebHostBuilder()
+                var hostBuilder = new WebHostBuilder()
                     .UseKestrel()
                     .UseUrls("http://*:5000")
                     .UseContentRoot(Directory.GetCurrentDirectory())
-                    .UseStartup<Startup>()
-                    .UseApplicationInsights()
-                    .Build();
+                    .UseStartup<Startup>();
+#if !DEBUG
+                hostBuilder = hostBuilder.UseApplicationInsights();
+#endif
+                var webHost = hostBuilder.Build();
 
                 triggerHost = new TriggerHost(webHost.Services);
 

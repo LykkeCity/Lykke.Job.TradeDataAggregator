@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using Lykke.Job.TradeDataAggregator.Core.Services;
+using Lykke.Sdk.Health;
 
 namespace Lykke.Job.TradeDataAggregator.Services
 {
-    public class HealthService : IHealthService
+    public class HealthService : IHealthService, IHealthServiceExt
     {
         public DateTime LastClientsScanningStartedMoment { get; private set; }
         public TimeSpan LastClientsScanningDuration { get; private set; }
@@ -45,11 +47,6 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
         public string GetHealthViolationMessage()
         {
-            return null;
-        }
-
-        public string GetHealthWarningMessage()
-        {
             if (!WasLastClientsScanningCompleted && !WasLastClientsScanningFailed && !WasClientsScanningEverStarted)
             {
                 return "Waiting for first clients scanning execution started";
@@ -72,6 +69,27 @@ namespace Lykke.Job.TradeDataAggregator.Services
             }
 
             return null;
+        }
+
+        public IEnumerable<HealthIssue> GetHealthIssues()
+        {
+            var issues = new List<HealthIssue>();
+            var message = GetHealthViolationMessage();
+            if (message != null)
+                issues.Add(HealthIssue.Create(string.Empty, message));
+            return issues;
+        }
+
+        public void Register(string type, string value)
+        {
+        }
+
+        public void ClearAllIssues()
+        {
+        }
+
+        public void ClearIssuesByType(string type)
+        {
         }
     }
 }
