@@ -76,11 +76,11 @@ namespace Lykke.Job.TradeDataAggregator.Modules
         {
             container.RegisterInstance<IMarketDataRepository>(
                 new MarketDataRepository(
-                    AzureTableStorage<MarketDataEntity>.Create(dbSettings.ConnectionString(s => s.HTradesConnString), "MarketsData", log)));
+                    AzureTableStorage<MarketDataEntity>.Create(dbSettings.ConnectionString(s => s.DataConnString), "MarketsData", log)));
 
             container.RegisterInstance<ITradesCommonRepository>(
                 new TradesCommonRepository(
-                    AzureTableStorage<TradeCommonEntity>.Create(dbSettings.ConnectionString(s => s.HTradesConnString), "TradesCommon", log)));
+                    AzureTableStorage<TradeCommonEntity>.Create(dbSettings.ConnectionString(s => s.DataConnString), "TradesCommon", log)));
 
             container.RegisterInstance<IClientTradesRepository>(
                 new ClientTradesRepository(

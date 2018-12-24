@@ -21,6 +21,7 @@ namespace Lykke.Job.TradeDataAggregator
     public class DbSettings
     {
         public string LogsConnString { get; set; }
+        public string DataConnString { get; set; }
         public string HTradesConnString { get; set; }
     }
 
