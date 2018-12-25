@@ -84,7 +84,11 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             container.RegisterInstance<IClientTradesRepository>(
                 new ClientTradesRepository(
-                    AzureTableStorage<ClientTradeEntity>.Create(dbSettings.ConnectionString(s =>s.HTradesConnString), "Trades", log)));
+                    AzureTableStorage<ClientTradeEntity>.Create(
+                        dbSettings.ConnectionString(s =>s.HTradesConnString),
+                        "Trades",
+                        log,
+                        TimeSpan.FromMinutes(5))));
         }
     }
 }
