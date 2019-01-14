@@ -1,4 +1,5 @@
 ﻿using System;
+using Lykke.Service.OperationsRepository.Client;
 using Lykke.SettingsReader.Attributes;
 
 namespace Lykke.Job.TradeDataAggregator
@@ -8,6 +9,7 @@ namespace Lykke.Job.TradeDataAggregator
         public TradeDataAggregatorSettings TradeDataAggregatorJob { get; set; }
         public SlackNotificationsSettings SlackNotifications { get; set; }
         public MarketProfileServiceClientSettings MarketProfileServiceClient { get; set; }
+        public OperationsRepositoryServiceClientSettings OperationsRepositoryServiceClient { get; set; }
         public AssetsSettings Assets { get; set; }
         public RabbitMqSettings RabbitMq { get; set; }
     }
