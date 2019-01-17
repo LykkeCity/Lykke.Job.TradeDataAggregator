@@ -10,6 +10,7 @@
     <PackageReference Include="Lykke.Sdk" Version="5.7.0" />
     <PackageReference Include="Lykke.Service.Assets.Client" Version="5.2.0" />
     <PackageReference Include="Lykke.Service.MarketProfile.Client" Version="1.1.0" />
+    <PackageReference Include="Lykke.Service.OperationsRepository.Client" Version="2.0.0" />
   </ItemGroup>
 
   <ItemGroup>
