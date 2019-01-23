@@ -33,13 +33,12 @@ namespace Lykke.Job.TradeDataAggregator.Services
             }
         }
 
+        private readonly TimeSpan _scanMaxDuration = TimeSpan.FromSeconds(30);
         private readonly IMarketDataRepository _marketDataRepository;
         private readonly IAssetsService _assetsService;
         private readonly ITradeOperationsRepositoryClient _tradeOperationsRepositoryClient;
         private readonly ILykkeMarketProfile _marketProfileService;
         private readonly ILog _log;
-
-        private readonly Dictionary<string, TemporaryAggregatedData> _tempDataByLimitOrderAndDtId = new Dictionary<string, TemporaryAggregatedData>();
 
         public TradeDataAggregationService(
             IMarketDataRepository marketDataRepository,
@@ -57,28 +56,33 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
         public async Task ScanClientsAsync()
         {
-            string continuationToken = null;
             var now = DateTime.UtcNow;
+
+            string continuationToken = null;
+            var tempDataByLimitOrderAndDtId = new Dictionary<string, TemporaryAggregatedData>();
+
             do
             {
                 var tradesResult = await _tradeOperationsRepositoryClient.GetByDatesAsync(
                     now.Subtract(TimeSpan.FromDays(1)),
                     now,
                     continuationToken);
-                HandleTradeRecords(tradesResult.Trades);
+                HandleTradeRecords(tradesResult.Trades, tempDataByLimitOrderAndDtId);
                 continuationToken = tradesResult.ContinuationToken;
             } while (continuationToken != null);
 
-            await FillMarketDataAsync();
+            await FillMarketDataAsync(tempDataByLimitOrderAndDtId);
 
-            _tempDataByLimitOrderAndDtId.Clear();
+            var scanDuration = DateTime.UtcNow - now;
+            if (scanDuration > _scanMaxDuration)
+                _log.WriteInfoAsync(nameof(TradeDataAggregationService), nameof(ScanClientsAsync), $"Scan took {scanDuration.TotalSeconds} seconds");
         }
 
-        private async Task FillMarketDataAsync()
+        private async Task FillMarketDataAsync(Dictionary<string, TemporaryAggregatedData> tempDataByLimitOrderAndDtId)
         {
             var newMarketData = new Dictionary<string, IMarketData>();
             var assetPairs = await _assetsService.AssetPairGetAllAsync();
-            var tempDataValues = _tempDataByLimitOrderAndDtId.Values.OrderBy(x => x.Dt);
+            var tempDataValues = tempDataByLimitOrderAndDtId.Values.OrderBy(x => x.Dt);
 
             var marketProfile = await _marketProfileService.ApiMarketProfileGetAsync();
             var assetPairsHash = marketProfile.Select(i => i.AssetPair).ToHashSet();
@@ -132,13 +136,13 @@ namespace Lykke.Job.TradeDataAggregator.Services
             return assetPair.QuotingAssetId == targetAsset;
         }
 
-        private void HandleTradeRecords(IEnumerable<ClientTrade> trades)
+        private void HandleTradeRecords(IEnumerable<ClientTrade> trades, Dictionary<string, TemporaryAggregatedData> tempDataByLimitOrderAndDtId)
         {
             foreach (var item in trades)
             {
                 try
                 {
-                    HandleTradeRecord(item);
+                    HandleTradeRecord(item, tempDataByLimitOrderAndDtId);
                 }
                 catch (Exception ex)
                 {
@@ -147,12 +151,12 @@ namespace Lykke.Job.TradeDataAggregator.Services
             }
         }
 
-        private void HandleTradeRecord(ClientTrade trade)
+        private void HandleTradeRecord(ClientTrade trade, Dictionary<string, TemporaryAggregatedData> tempDataByLimitOrderAndDtId)
         {
             var key = TemporaryAggregatedData.CreateKey(trade.LimitOrderId, trade.DateTime);
-            if (!_tempDataByLimitOrderAndDtId.ContainsKey(key))
+            if (!tempDataByLimitOrderAndDtId.ContainsKey(key))
             {
-                _tempDataByLimitOrderAndDtId.Add(key, new TemporaryAggregatedData
+                tempDataByLimitOrderAndDtId.Add(key, new TemporaryAggregatedData
                 {
                     Asset1 = trade.AssetId,
                     ClientId = trade.ClientId,
@@ -164,7 +168,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
                 return;
             }
 
-            var tempRecord = _tempDataByLimitOrderAndDtId[key];
+            var tempRecord = tempDataByLimitOrderAndDtId[key];
             if (tempRecord.ClientId == trade.ClientId)
             {
                 tempRecord.Asset2 = trade.AssetId;
