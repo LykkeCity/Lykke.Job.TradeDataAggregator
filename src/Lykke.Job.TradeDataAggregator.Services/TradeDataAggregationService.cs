@@ -58,17 +58,20 @@ namespace Lykke.Job.TradeDataAggregator.Services
         public async Task ScanClientsAsync()
         {
             string continuationToken = null;
+            var now = DateTime.UtcNow;
             do
             {
                 var tradesResult = await _tradeOperationsRepositoryClient.GetByDatesAsync(
-                    DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)),
-                    DateTime.UtcNow,
+                    now.Subtract(TimeSpan.FromDays(1)),
+                    now,
                     continuationToken);
                 HandleTradeRecords(tradesResult.Trades);
                 continuationToken = tradesResult.ContinuationToken;
             } while (continuationToken != null);
 
             await FillMarketDataAsync();
+
+            _tempDataByLimitOrderAndDtId.Clear();
         }
 
         private async Task FillMarketDataAsync()
@@ -129,7 +132,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
             return assetPair.QuotingAssetId == targetAsset;
         }
 
-        private Task HandleTradeRecords(IEnumerable<ClientTrade> trades)
+        private void HandleTradeRecords(IEnumerable<ClientTrade> trades)
         {
             foreach (var item in trades)
             {
@@ -142,8 +145,6 @@ namespace Lykke.Job.TradeDataAggregator.Services
                     _log.WriteError("HandleTradeRecords", item.ToJson(), ex);
                 }
             }
-
-            return Task.CompletedTask;
         }
 
         private void HandleTradeRecord(ClientTrade trade)

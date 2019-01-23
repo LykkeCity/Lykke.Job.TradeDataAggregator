@@ -49,6 +49,7 @@ namespace Lykke.Job.TradeDataAggregator
                 .SetMessageReadStrategy(new MessageReadWithTemporaryQueueStrategy())
                 .SetLogger(_log)
                 .Subscribe(ProcessTrade)
+                .SetPrefetchCount(1000)
                 .Start();
         }
 
