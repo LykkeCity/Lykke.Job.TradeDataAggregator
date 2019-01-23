@@ -33,6 +33,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
             }
         }
 
+        private readonly TimeSpan _scanMaxDuration = TimeSpan.FromSeconds(30);
         private readonly IMarketDataRepository _marketDataRepository;
         private readonly IAssetsService _assetsService;
         private readonly ITradeOperationsRepositoryClient _tradeOperationsRepositoryClient;
@@ -55,10 +56,9 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
         public async Task ScanClientsAsync()
         {
-            _log.WriteInfoAsync(nameof(TradeDataAggregationService), nameof(ScanClientsAsync), "Scan is started");
+            var now = DateTime.UtcNow;
 
             string continuationToken = null;
-            var now = DateTime.UtcNow;
             var tempDataByLimitOrderAndDtId = new Dictionary<string, TemporaryAggregatedData>();
 
             do
@@ -73,7 +73,9 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
             await FillMarketDataAsync(tempDataByLimitOrderAndDtId);
 
-            _log.WriteInfoAsync(nameof(TradeDataAggregationService), nameof(ScanClientsAsync), "Scan is finished");
+            var scanDuration = DateTime.UtcNow - now;
+            if (scanDuration > _scanMaxDuration)
+                _log.WriteInfoAsync(nameof(TradeDataAggregationService), nameof(ScanClientsAsync), $"Scan took {scanDuration.TotalSeconds} seconds");
         }
 
         private async Task FillMarketDataAsync(Dictionary<string, TemporaryAggregatedData> tempDataByLimitOrderAndDtId)
