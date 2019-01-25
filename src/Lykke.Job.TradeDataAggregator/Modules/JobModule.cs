@@ -60,9 +60,8 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             builder.RegisterOperationsRepositoryClients(_settings.OperationsRepositoryServiceClient);
 
-            builder.RegisterInstance(new LykkeMarketProfile(new Uri(_settings.MarketProfileServiceClient.ServiceUrl), new HttpClient()))
-                .As<ILykkeMarketProfile>()
-                .SingleInstance();
+            builder.RegisterInstance<ILykkeMarketProfile>(
+                new LykkeMarketProfile(new Uri(_settings.MarketProfileServiceClient.ServiceUrl), new HttpClient()));
 
             RegisterAzureRepositories(builder, _settingsManager.Nested(s => s.TradeDataAggregatorJob.Db), _log);
 
