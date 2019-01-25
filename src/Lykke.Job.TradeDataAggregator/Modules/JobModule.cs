@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net.Http;
 using Autofac;
 using AzureStorage.Tables;
 using Common.Log;
@@ -59,9 +60,8 @@ namespace Lykke.Job.TradeDataAggregator.Modules
 
             builder.RegisterOperationsRepositoryClients(_settings.OperationsRepositoryServiceClient);
 
-            builder.RegisterType<LykkeMarketProfile>()
-                .As<ILykkeMarketProfile>()
-                .WithParameter("baseUri", new Uri(_settings.MarketProfileServiceClient.ServiceUrl));
+            builder.RegisterInstance<ILykkeMarketProfile>(
+                new LykkeMarketProfile(new Uri(_settings.MarketProfileServiceClient.ServiceUrl), new HttpClient()));
 
             RegisterAzureRepositories(builder, _settingsManager.Nested(s => s.TradeDataAggregatorJob.Db), _log);
 
