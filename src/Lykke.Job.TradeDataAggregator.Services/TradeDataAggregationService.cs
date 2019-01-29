@@ -76,6 +76,8 @@ namespace Lykke.Job.TradeDataAggregator.Services
             var scanDuration = DateTime.UtcNow - now;
             if (scanDuration > _scanMaxDuration)
                 _log.WriteInfoAsync(nameof(TradeDataAggregationService), nameof(ScanClientsAsync), $"Scan took {scanDuration.TotalSeconds} seconds");
+
+            GC.Collect(GC.MaxGeneration);
         }
 
         private async Task FillMarketDataAsync(Dictionary<string, TemporaryAggregatedData> tempDataByLimitOrderAndDtId)
@@ -89,10 +91,13 @@ namespace Lykke.Job.TradeDataAggregator.Services
 
             foreach (var record in tempDataValues)
             {
+                if (record.Volume1 <= 0)
+                    continue;
+
                 try
                 {
                     var assetPair = FindPairWithAssets(assetPairs, record.Asset1, record.Asset2);
-                    if (assetPair == null || record.Volume1 <= 0 || !assetPairsHash.Contains(assetPair.Id))
+                    if (assetPair == null || !assetPairsHash.Contains(assetPair.Id))
                         continue;
 
                     var isInverted = IsInvertedTarget(assetPair, record.Asset1);
