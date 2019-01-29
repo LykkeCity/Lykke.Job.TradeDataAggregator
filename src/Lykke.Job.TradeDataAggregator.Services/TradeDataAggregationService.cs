@@ -77,7 +77,7 @@ namespace Lykke.Job.TradeDataAggregator.Services
             if (scanDuration > _scanMaxDuration)
                 _log.WriteInfoAsync(nameof(TradeDataAggregationService), nameof(ScanClientsAsync), $"Scan took {scanDuration.TotalSeconds} seconds");
 
-            tempDataByLimitOrderAndDtId.Clear();
+            GC.Collect(GC.MaxGeneration);
         }
 
         private async Task FillMarketDataAsync(Dictionary<string, TemporaryAggregatedData> tempDataByLimitOrderAndDtId)
@@ -126,11 +126,6 @@ namespace Lykke.Job.TradeDataAggregator.Services
             }
 
             await _marketDataRepository.AddOrMergeMarketData(newMarketData.Values);
-
-            newMarketData.Clear();
-            assetPairs.Clear();
-            marketProfile.Clear();
-            assetPairsHash.Clear();
         }
 
         private static AssetPair FindPairWithAssets(IEnumerable<AssetPair> src, string assetId1, string assetId2)
